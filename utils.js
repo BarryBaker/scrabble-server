@@ -1,0 +1,35 @@
+function hasIsolatedLetters(allLetters) {
+  const boardSize = 15;
+  const board = Array.from({ length: boardSize }, () =>
+    Array(boardSize).fill(null)
+  );
+
+  // Place the letters on the board
+  const boardLetters = allLetters.filter((letter) =>
+    letter.place.startsWith("board")
+  );
+  for (let letterObj of boardLetters) {
+    const [_, row, col] = letterObj.place.split("-");
+    board[parseInt(row)][parseInt(col)] = letterObj;
+  }
+
+  // Check for isolated letters
+  for (let row = 0; row < boardSize; row++) {
+    for (let col = 0; col < boardSize; col++) {
+      const letterObj = board[row][col];
+      if (letterObj && !letterObj.confirmed) {
+        const hasNeighbor =
+          (row > 0 && board[row - 1][col]) ||
+          (row < boardSize - 1 && board[row + 1][col]) ||
+          (col > 0 && board[row][col - 1]) ||
+          (col < boardSize - 1 && board[row][col + 1]);
+        if (!hasNeighbor) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+module.exports = { hasIsolatedLetters };
