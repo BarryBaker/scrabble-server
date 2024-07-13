@@ -10,7 +10,7 @@ const { calculateScore } = require("./calcScore");
 let players = [];
 let currentTurn = 0;
 
-let requiredPlayers = 2;
+let requiredPlayers = 3;
 // let remainingLetters = 101;
 
 origi_board = JSON.parse(JSON.stringify(origi_board)); // Deep copy the initial board
@@ -206,11 +206,14 @@ function endGame(winner) {
 wss.on("connection", (ws) => {
   ws.on("message", (message) => {
     const data = JSON.parse(message);
+    const player = players.find((p) => p.name === data.player);
 
     switch (data.type) {
       case "join":
+        // let player = players.find((p) => p.name === data.player);
+        // console.log(player);
         if (!players.some((player) => player.ws === ws)) {
-          const newName = `Player ${players.length + 1}`;
+          const newName = data.name || `Player ${players.length + 1}`;
           // console.log(newName);
           const newPlayer = { name: newName, ws, score: 0, surrendered: false };
           players.push(newPlayer);
@@ -248,7 +251,7 @@ wss.on("connection", (ws) => {
         break;
 
       case "turn":
-        const beforeTurnPlayer = players.find((p) => p.name === data.player);
+        // const beforeTurnPlayer = players.find((p) => p.name === data.player);
         // Initialize the board
         // const newboard= buildBoard();
         const boardSize = 15; // Assuming a 15x15 Scrabble board
@@ -331,7 +334,7 @@ wss.on("connection", (ws) => {
             type: "turn",
             player: getNextPlayer(data.player, players),
           });
-          fillLetters(beforeTurnPlayer);
+          fillLetters(player);
         }
         function packBackLetters() {
           allLetters.forEach((letter) => {
@@ -361,8 +364,23 @@ wss.on("connection", (ws) => {
         }
 
         let goodWords = [];
-        if (words.length === 1) {
-          goodWords.push(words[0]);
+        if (words.length === 1 && classifiedWords.onlyUnconfirmed.length > 0) {
+          const containsMiddleCell = words[0].some(
+            (letter) => letter.row === 7 && letter.col === 7
+          );
+          const isHorizontal = words[0].every((letter) => letter.row === 7);
+          const startsAtMiddleAndGoesRight =
+            words[0][0].row === 7 && words[0][0].col === 7;
+          if (
+            containsMiddleCell &&
+            isHorizontal &&
+            startsAtMiddleAndGoesRight
+          ) {
+            goodWords.push(words[0]);
+          } else {
+            packBackLetters();
+            break;
+          }
         } else {
           goodWords = [...classifiedWords.mixed];
         }
@@ -378,9 +396,9 @@ wss.on("connection", (ws) => {
 
             if (validWords.length === allWords.length) {
               const score = calculateScore(goodWords);
-              beforeTurnPlayer.score += score;
+              player.score += score;
               if (unconfirmedCount === 7) {
-                beforeTurnPlayer.score += 50;
+                player.score += 50;
               }
 
               broadcast({
@@ -440,7 +458,7 @@ wss.on("connection", (ws) => {
         ) {
           break;
         }
-        const player = players.find((p) => p.name === data.player);
+        // const player = players.find((p) => p.name === data.player);
         // Return current player's letters to the bag
         allLetters.forEach((letter) => {
           if (letter.place === `player-${player.name}`) {
@@ -454,6 +472,26 @@ wss.on("connection", (ws) => {
           type: "turn",
           player: getNextPlayer(data.player, players),
         });
+        break;
+      case "shuffle":
+        if (
+          allLetters.some(
+            (letter) => letter.place.startsWith("board") && !letter.confirmed
+          )
+        ) {
+          break;
+        }
+        const playerLetters = allLetters.filter(
+          (letter) => letter.place === `player-${player.name}`
+        );
+
+        shuffle(playerLetters);
+        player.ws.send(
+          JSON.stringify({
+            type: "update-letters",
+            letters: playerLetters,
+          })
+        );
         break;
       case "surrender":
         if (
