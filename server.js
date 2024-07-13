@@ -4,7 +4,8 @@ const { exec } = require("child_process");
 
 let origi_board = require("./initialBoard");
 let letters = require("./letters");
-const { hasIsolatedLetters } = require("./utils");
+const { hasIsolatedLetters, getNextPlayer } = require("./utils");
+const { calculateScore } = require("./calcScore");
 
 let players = [];
 let currentTurn = 0;
@@ -32,10 +33,13 @@ letters.forEach((letter) => {
 });
 
 //Shuffle letters
-for (let i = allLetters.length - 1; i > 0; i--) {
-  const j = Math.floor(Math.random() * (i + 1));
-  [allLetters[i], allLetters[j]] = [allLetters[j], allLetters[i]];
+function shuffle(letters) {
+  for (let i = letters.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [letters[i], letters[j]] = [letters[j], letters[i]];
+  }
 }
+shuffle(allLetters);
 
 function remainingLetters() {
   const remainingLetters = allLetters.filter(
@@ -105,8 +109,8 @@ function buildBoard() {
       confirmed: letterObj.confirmed,
     };
   }
-
-  broadcast({ type: "update-board", board: board });
+  return board;
+  // broadcast({ type: "update-board", board: board });
 }
 function sendLetters() {
   players.forEach((player) => {
@@ -126,13 +130,13 @@ function startGame() {
   players.forEach((player) => {
     fillLetters(player);
   });
-
+  shuffle(players);
   currentTurn = Math.floor(Math.random() * players.length);
 
   broadcast({ type: "start-game" });
   broadcast({ type: "turn", player: players[currentTurn].name });
-  buildBoard();
-  // broadcast({ type: "update-board", board: board });
+
+  broadcast({ type: "update-board", board: buildBoard() });
 }
 
 function broadcast(data) {
@@ -152,6 +156,53 @@ async function validateWords(words) {
   }
   return validWords;
 }
+
+function endGame(winner) {
+  allLetters.forEach((letter) => {
+    if (letter.place.startsWith("board")) {
+      letter.confirmed = true;
+    }
+  });
+
+  broadcast({ type: "update-board", board: buildBoard() });
+  const playersLetterPoints = players.map((player) => {
+    const letterPoints = allLetters
+      .filter((letter) => letter.place === `player-${player.name}`)
+      .reduce((total, letter) => total + letter.points, 0);
+
+    return {
+      name: player.name,
+      letterPoints: letterPoints,
+    };
+  });
+
+  players.forEach((player) => {
+    const playerLetterPoints = playersLetterPoints.find(
+      (p) => p.name === player.name
+    ).letterPoints;
+    player.score -= playerLetterPoints;
+  });
+
+  if (winner) {
+    const totalRemainingPoints = playersLetterPoints.reduce(
+      (sum, player) => sum + player.letterPoints,
+      0
+    );
+    const winnerPlayer = players.find((p) => p.name === winner);
+    winnerPlayer.score += totalRemainingPoints;
+  }
+  broadcast({
+    type: "update-score",
+    scores: players.reduce((acc, player) => {
+      acc[player.name] = player.score;
+      return acc;
+    }, {}),
+  });
+  broadcast({
+    type: "end-game",
+  });
+}
+
 wss.on("connection", (ws) => {
   ws.on("message", (message) => {
     const data = JSON.parse(message);
@@ -161,7 +212,7 @@ wss.on("connection", (ws) => {
         if (!players.some((player) => player.ws === ws)) {
           const newName = `Player ${players.length + 1}`;
           // console.log(newName);
-          const newPlayer = { name: newName, ws };
+          const newPlayer = { name: newName, ws, score: 0, surrendered: false };
           players.push(newPlayer);
           newPlayer.ws.send(
             JSON.stringify({
@@ -187,15 +238,19 @@ wss.on("connection", (ws) => {
             letter.place = `player-${data.player}`;
             if (letter.isWild) {
               letter.letter = "";
+              letter.points = null;
             }
           }
         });
-        buildBoard();
+
+        broadcast({ type: "update-board", board: buildBoard() });
         sendLetters();
         break;
 
       case "turn":
+        const beforeTurnPlayer = players.find((p) => p.name === data.player);
         // Initialize the board
+        // const newboard= buildBoard();
         const boardSize = 15; // Assuming a 15x15 Scrabble board
         const newboard = Array.from({ length: boardSize }, () =>
           Array(boardSize).fill(null)
@@ -210,8 +265,12 @@ wss.on("connection", (ws) => {
           newboard[parseInt(row)][parseInt(col)] = {
             letter: letterObj.letter,
             confirmed: letterObj.confirmed,
+            points: letterObj.points,
           };
         }
+        const unconfirmedCount = boardLetters.filter(
+          (letter) => !letter.confirmed
+        ).length;
 
         const words = [];
 
@@ -238,12 +297,8 @@ wss.on("connection", (ws) => {
             }
           }
         }
-
-        // Collect horizontal and vertical words
         collectWordsInDirection(true);
         collectWordsInDirection(false);
-
-        // console.log(words);
 
         const classifiedWords = {
           onlyConfirmed: [],
@@ -263,7 +318,6 @@ wss.on("connection", (ws) => {
             classifiedWords.onlyUnconfirmed.push(word);
           }
         }
-        // console.log(classifiedWords);
 
         function continueGame() {
           allLetters.forEach((letter) => {
@@ -271,54 +325,33 @@ wss.on("connection", (ws) => {
               letter.confirmed = true;
             }
           });
-          buildBoard();
-          broadcast({ type: "turn", player: data.nextPlayer });
 
-          const beforeTurnPlayer = players.find(
-            (p) => p.name === data.beforePlayer
-          );
+          broadcast({ type: "update-board", board: buildBoard() });
+          broadcast({
+            type: "turn",
+            player: getNextPlayer(data.player, players),
+          });
           fillLetters(beforeTurnPlayer);
         }
         function packBackLetters() {
           allLetters.forEach((letter) => {
             if (letter.place.startsWith("board") && !letter.confirmed) {
-              letter.place = `player-${data.beforePlayer}`;
+              letter.place = `player-${data.player}`;
               if (letter.isWild) {
                 letter.letter = "";
+                letter.points = null;
               }
             }
           });
-          buildBoard();
+
+          broadcast({ type: "update-board", board: buildBoard() });
           sendLetters();
         }
-
         if (
-          classifiedWords.onlyConfirmed.length === 0 &&
-          classifiedWords.mixed.length === 0 &&
+          (classifiedWords.onlyConfirmed.length > 0 ||
+            classifiedWords.mixed.length > 0) &&
           classifiedWords.onlyUnconfirmed.length > 0
         ) {
-          const ucwords = classifiedWords.onlyUnconfirmed.map((word) =>
-            word.map((letter) => letter.letter).join("")
-          );
-          validateWords(ucwords)
-            .then((validWords) => {
-              const invalidWords = ucwords.filter(
-                (word) => !validWords.includes(word)
-              );
-
-              if (validWords.length === ucwords.length) {
-                continueGame();
-              } else {
-                console.log("Invalid words found: ", invalidWords);
-                packBackLetters();
-              }
-            })
-            .catch((error) => {
-              console.error("Error during word validation: ", error);
-            });
-          break;
-        }
-        if (classifiedWords.onlyUnconfirmed.length > 0) {
           packBackLetters();
           break;
         }
@@ -326,30 +359,58 @@ wss.on("connection", (ws) => {
           packBackLetters();
           break;
         }
-        const mixedWords = classifiedWords.mixed.map((word) =>
+
+        let goodWords = [];
+        if (words.length === 1) {
+          goodWords.push(words[0]);
+        } else {
+          goodWords = [...classifiedWords.mixed];
+        }
+
+        const allWords = goodWords.map((word) =>
           word.map((letter) => letter.letter).join("")
         );
-        // Validate each word using hunspell
-        validateWords(mixedWords)
+        validateWords(allWords)
           .then((validWords) => {
-            const invalidWords = mixedWords.filter(
+            const invalidWords = allWords.filter(
               (word) => !validWords.includes(word)
             );
 
-            if (validWords.length === mixedWords.length) {
-              continueGame();
+            if (validWords.length === allWords.length) {
+              const score = calculateScore(goodWords);
+              beforeTurnPlayer.score += score;
+              if (unconfirmedCount === 7) {
+                beforeTurnPlayer.score += 50;
+              }
+
+              broadcast({
+                type: "update-score",
+                scores: players.reduce((acc, player) => {
+                  acc[player.name] = player.score;
+                  return acc;
+                }, {}),
+              });
+
+              //Check if game ends
+              if (
+                allLetters.filter(
+                  (letter) => letter.place === `player-${data.player}`
+                ).length === 0 &&
+                allLetters.filter((letter) => letter.place === "bag").length ===
+                  0
+              ) {
+                endGame(data.player);
+              } else {
+                continueGame();
+              }
             } else {
-              console.log("Invalid words found: ", invalidWords);
+              // console.log("Invalid words found: ", invalidWords);
               packBackLetters();
             }
           })
           .catch((error) => {
             console.error("Error during word validation: ", error);
           });
-        // checkWordWithHunspell("ál").then((value) => {
-        //   // console.log(value);
-        // });
-
         break;
 
       case "update-board-cell":
@@ -361,21 +422,58 @@ wss.on("connection", (ws) => {
         theLetter.place = `board-${rowIndex}-${colIndex}`;
         if (desiredLetter) {
           theLetter.letter = desiredLetter;
+          theLetter.points = letters.filter(
+            (l) => l.letter === theLetter.letter
+          )[0].points;
           theLetter["isWid"] = true;
         }
         sendLetters();
 
-        //Update board
-        buildBoard();
-        // const letters = allLetters.filter((letter) =>
-        //   letter.place.startsWith("board")
-        // );
-        // for (let l of letters) {
-        //   const splitted = l.place.split("-");
-        //   board[splitted[1]][splitted[2]].letter = l.letter;
-        //   board[splitted[1]][splitted[2]].points = l.points;
-        // }
-        // broadcast({ type: "update-board", board: board });
+        broadcast({ type: "update-board", board: buildBoard() });
+
+        break;
+      case "change-all-letters":
+        if (
+          allLetters.some(
+            (letter) => letter.place.startsWith("board") && !letter.confirmed
+          )
+        ) {
+          break;
+        }
+        const player = players.find((p) => p.name === data.player);
+        // Return current player's letters to the bag
+        allLetters.forEach((letter) => {
+          if (letter.place === `player-${player.name}`) {
+            letter.place = "bag";
+          }
+        });
+
+        shuffle(allLetters);
+        fillLetters(player);
+        broadcast({
+          type: "turn",
+          player: getNextPlayer(data.player, players),
+        });
+        break;
+      case "surrender":
+        if (
+          allLetters.some(
+            (letter) => letter.place.startsWith("board") && !letter.confirmed
+          )
+        ) {
+          break;
+        }
+        const theplayer = players.find((p) => p.name === data.player);
+        theplayer.surrendered = true;
+        if (players.every((p) => p.surrendered)) {
+          endGame();
+          break;
+        }
+
+        broadcast({
+          type: "turn",
+          player: getNextPlayer(data.player, players),
+        });
         break;
     }
   });

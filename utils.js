@@ -32,4 +32,15 @@ function hasIsolatedLetters(allLetters) {
   return false;
 }
 
-module.exports = { hasIsolatedLetters };
+function getNextPlayer(currentPlayerName, players) {
+  const activePlayers = players.filter((player) => !player.surrendered);
+
+  const currentIndex = activePlayers.findIndex(
+    (player) => player.name === currentPlayerName
+  );
+  const nextIndex = (currentIndex + 1) % activePlayers.length;
+
+  return activePlayers[nextIndex].name;
+}
+
+module.exports = { hasIsolatedLetters, getNextPlayer };

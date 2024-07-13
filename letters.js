@@ -1,5 +1,5 @@
 const letters = [
-  { letter: "", points: 0, count: 2 },
+  { letter: "", points: null, count: 2 },
   { letter: "A", points: 1, count: 6 },
   { letter: "E", points: 1, count: 6 },
   { letter: "K", points: 1, count: 6 },
