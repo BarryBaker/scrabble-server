@@ -4,17 +4,17 @@ const { exec } = require("child_process");
 
 let origi_board = require("./initialBoard");
 let letters = require("./letters");
-const { hasIsolatedLetters, getNextPlayer } = require("./utils");
+const { hasIsolatedLetters, getNextPlayer, shuffle } = require("./utils");
 const { calculateScore } = require("./calcScore");
 
 let players = [];
-let currentTurn = 0;
+// let currentTurn = 0;
 
-let requiredPlayers = 3;
+let requiredPlayers = 2;
 // let remainingLetters = 101;
-
-origi_board = JSON.parse(JSON.stringify(origi_board)); // Deep copy the initial board
-letters = JSON.parse(JSON.stringify(letters)); // Deep copy the initial board
+// console.log(letters);
+// origi_board = JSON.parse(JSON.stringify(origi_board)); // Deep copy the initial board
+// letters = JSON.parse(JSON.stringify(letters)); // Deep copy the initial board
 
 const allLetters = [];
 // Assign unique IDs to letters
@@ -32,13 +32,6 @@ letters.forEach((letter) => {
   }
 });
 
-//Shuffle letters
-function shuffle(letters) {
-  for (let i = letters.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [letters[i], letters[j]] = [letters[j], letters[i]];
-  }
-}
 shuffle(allLetters);
 
 function remainingLetters() {
@@ -131,10 +124,10 @@ function startGame() {
     fillLetters(player);
   });
   shuffle(players);
-  currentTurn = Math.floor(Math.random() * players.length);
+  const firstToAct = Math.floor(Math.random() * players.length);
 
   broadcast({ type: "start-game" });
-  broadcast({ type: "turn", player: players[currentTurn].name });
+  broadcast({ type: "turn", player: players[firstToAct].name });
 
   broadcast({ type: "update-board", board: buildBoard() });
 }
