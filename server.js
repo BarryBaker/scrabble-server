@@ -1,45 +1,23 @@
 const WebSocket = require("ws");
 const wss = new WebSocket.Server({ port: 3000 });
-const { exec } = require("child_process");
 
-let origi_board = require("./initialBoard");
-let letters = require("./letters");
-const { hasIsolatedLetters, getNextPlayer, shuffle } = require("./utils");
+const {
+  hasIsolatedLetters,
+  getNextPlayer,
+  shuffle,
+  remainingLetters,
+  // broadcast,
+} = require("./utils");
 const { calculateScore } = require("./calcScore");
-
-let players = [];
-// let currentTurn = 0;
+const { checkWordWithHunspell } = require("./hunspell");
+const { Player } = require("./player");
+const { allLetters, buildBoard, someUnconfirmed } = require("./gameTools");
 
 let requiredPlayers = 2;
-// let remainingLetters = 101;
-// console.log(letters);
-// origi_board = JSON.parse(JSON.stringify(origi_board)); // Deep copy the initial board
-// letters = JSON.parse(JSON.stringify(letters)); // Deep copy the initial board
-
-const allLetters = [];
-// Assign unique IDs to letters
-let letterIdCounter = 1;
-letters.forEach((letter) => {
-  for (let i = 0; i < letter.count; i++) {
-    allLetters.push({
-      id: letterIdCounter++,
-      letter: letter.letter,
-      points: letter.points,
-      place: "bag",
-      confirmed: false,
-      isWild: letter.letter === "",
-    });
-  }
-});
+let players = [];
 
 shuffle(allLetters);
 
-function remainingLetters() {
-  const remainingLetters = allLetters.filter(
-    (letter) => letter.place === "bag"
-  ).length;
-  broadcast({ type: "remaining-letters", remainingLetters });
-}
 function fillLetters(player) {
   const playerLetters = allLetters.filter(
     (letter) => letter.place === `player-${player.name}`
@@ -58,53 +36,17 @@ function fillLetters(player) {
       ),
     })
   );
-  remainingLetters();
+  broadcast({
+    type: "remaining-letters",
+    remainingLetters: remainingLetters(allLetters).length,
+  });
 }
-
-function checkWordWithHunspell(word) {
-  return new Promise((resolve, reject) => {
-    exec(
-      `echo "${word}" | hunspell -d /usr/local/share/hunspell/hu_HU`,
-      (error, stdout, stderr) => {
-        if (error) {
-          reject(error);
-        } else {
-          // console.log(`Hunspell output for word "${word}":`, stdout, stderr);
-          const isCorrect = stdout.includes("*") || stdout.includes("+");
-          resolve(isCorrect);
-        }
-      }
-    );
+function broadcast(data) {
+  players.forEach((player) => {
+    player.ws.send(JSON.stringify(data));
   });
 }
 
-function buildBoard() {
-  const board = origi_board.map((row) =>
-    row.map((cell) => ({
-      letter: null,
-      points: null,
-      confirmed: null,
-      text: cell,
-    }))
-  );
-
-  const boardLetters = allLetters.filter((letter) =>
-    letter.place.startsWith("board")
-  );
-  for (let letterObj of boardLetters) {
-    const [_, row, col] = letterObj.place.split("-");
-
-    board[parseInt(row)][parseInt(col)] = {
-      letter: letterObj.letter,
-      points: letterObj.isWild
-        ? letters.filter((l) => l.letter === letterObj.letter)[0].points
-        : letterObj.points,
-      confirmed: letterObj.confirmed,
-    };
-  }
-  return board;
-  // broadcast({ type: "update-board", board: board });
-}
 function sendLetters() {
   players.forEach((player) => {
     player.ws.send(
@@ -123,19 +65,14 @@ function startGame() {
   players.forEach((player) => {
     fillLetters(player);
   });
+
   shuffle(players);
   const firstToAct = Math.floor(Math.random() * players.length);
 
   broadcast({ type: "start-game" });
   broadcast({ type: "turn", player: players[firstToAct].name });
 
-  broadcast({ type: "update-board", board: buildBoard() });
-}
-
-function broadcast(data) {
-  players.forEach((player) => {
-    player.ws.send(JSON.stringify(data));
-  });
+  broadcast({ type: "update-board", board: buildBoard(allLetters) });
 }
 
 // Function to check words using hunspell
@@ -157,7 +94,7 @@ function endGame(winner) {
     }
   });
 
-  broadcast({ type: "update-board", board: buildBoard() });
+  broadcast({ type: "update-board", board: buildBoard(allLetters) });
   const playersLetterPoints = players.map((player) => {
     const letterPoints = allLetters
       .filter((letter) => letter.place === `player-${player.name}`)
@@ -203,11 +140,9 @@ wss.on("connection", (ws) => {
 
     switch (data.type) {
       case "join":
-        // let player = players.find((p) => p.name === data.player);
-        // console.log(player);
         if (!players.some((player) => player.ws === ws)) {
           const newName = data.name || `Player ${players.length + 1}`;
-          // console.log(newName);
+
           const newPlayer = { name: newName, ws, score: 0, surrendered: false };
           players.push(newPlayer);
           newPlayer.ws.send(
@@ -217,12 +152,12 @@ wss.on("connection", (ws) => {
             })
           );
 
-          broadcast({
-            type: "players",
-            players: players.map((p) => p.name),
-            requiredPlayers,
-          });
           if (players.length === requiredPlayers) {
+            broadcast({
+              type: "players",
+              players: players.map((p) => p.name),
+              requiredPlayers,
+            });
             startGame();
           }
         }
@@ -239,14 +174,11 @@ wss.on("connection", (ws) => {
           }
         });
 
-        broadcast({ type: "update-board", board: buildBoard() });
+        broadcast({ type: "update-board", board: buildBoard(allLetters) });
         sendLetters();
         break;
 
       case "turn":
-        // const beforeTurnPlayer = players.find((p) => p.name === data.player);
-        // Initialize the board
-        // const newboard= buildBoard();
         const boardSize = 15; // Assuming a 15x15 Scrabble board
         const newboard = Array.from({ length: boardSize }, () =>
           Array(boardSize).fill(null)
@@ -264,9 +196,7 @@ wss.on("connection", (ws) => {
             points: letterObj.points,
           };
         }
-        const unconfirmedCount = boardLetters.filter(
-          (letter) => !letter.confirmed
-        ).length;
+        // const newboard = buildBoard(allLetters);
 
         const words = [];
 
@@ -322,7 +252,7 @@ wss.on("connection", (ws) => {
             }
           });
 
-          broadcast({ type: "update-board", board: buildBoard() });
+          broadcast({ type: "update-board", board: buildBoard(allLetters) });
           broadcast({
             type: "turn",
             player: getNextPlayer(data.player, players),
@@ -340,7 +270,7 @@ wss.on("connection", (ws) => {
             }
           });
 
-          broadcast({ type: "update-board", board: buildBoard() });
+          broadcast({ type: "update-board", board: buildBoard(allLetters) });
           sendLetters();
         }
         if (
@@ -390,7 +320,12 @@ wss.on("connection", (ws) => {
             if (validWords.length === allWords.length) {
               const score = calculateScore(goodWords);
               player.score += score;
-              if (unconfirmedCount === 7) {
+              if (
+                allLetters.filter(
+                  (letter) =>
+                    letter.place.startsWith("board") && !letter.confirmed
+                ).length === 7
+              ) {
                 player.score += 50;
               }
 
@@ -426,11 +361,10 @@ wss.on("connection", (ws) => {
 
       case "update-board-cell":
         const { rowIndex, colIndex, id, desiredLetter } = data;
-        // console.log(allLetters, id.type);
-        // Find the active player and remove the letter from their letters array
         const theLetter = allLetters.find((l) => l.id === Number(id));
 
         theLetter.place = `board-${rowIndex}-${colIndex}`;
+
         if (desiredLetter) {
           theLetter.letter = desiredLetter;
           theLetter.points = letters.filter(
@@ -440,19 +374,14 @@ wss.on("connection", (ws) => {
         }
         sendLetters();
 
-        broadcast({ type: "update-board", board: buildBoard() });
+        broadcast({ type: "update-board", board: buildBoard(allLetters) });
 
         break;
       case "change-all-letters":
-        if (
-          allLetters.some(
-            (letter) => letter.place.startsWith("board") && !letter.confirmed
-          )
-        ) {
+        if (someUnconfirmed(allLetters)) {
           break;
         }
-        // const player = players.find((p) => p.name === data.player);
-        // Return current player's letters to the bag
+
         allLetters.forEach((letter) => {
           if (letter.place === `player-${player.name}`) {
             letter.place = "bag";
@@ -467,11 +396,7 @@ wss.on("connection", (ws) => {
         });
         break;
       case "shuffle":
-        if (
-          allLetters.some(
-            (letter) => letter.place.startsWith("board") && !letter.confirmed
-          )
-        ) {
+        if (someUnconfirmed(allLetters)) {
           break;
         }
         const playerLetters = allLetters.filter(
@@ -487,11 +412,7 @@ wss.on("connection", (ws) => {
         );
         break;
       case "surrender":
-        if (
-          allLetters.some(
-            (letter) => letter.place.startsWith("board") && !letter.confirmed
-          )
-        ) {
+        if (someUnconfirmed(allLetters)) {
           break;
         }
         const theplayer = players.find((p) => p.name === data.player);

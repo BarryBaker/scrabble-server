@@ -50,4 +50,14 @@ function shuffle(items) {
   }
 }
 
-module.exports = { hasIsolatedLetters, getNextPlayer, shuffle };
+function remainingLetters(letters) {
+  return letters.filter((letter) => letter.place === "bag");
+}
+
+module.exports = {
+  hasIsolatedLetters,
+  getNextPlayer,
+  shuffle,
+  remainingLetters,
+  // broadcast,
+};
