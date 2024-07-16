@@ -13,7 +13,7 @@ const { checkWordWithHunspell } = require("./hunspell");
 const { Player } = require("./player");
 const { allLetters, buildBoard, someUnconfirmed } = require("./gameTools");
 
-let requiredPlayers = 3;
+let requiredPlayers = 2;
 let players = [];
 
 shuffle(allLetters);
@@ -41,6 +41,7 @@ function fillLetters(player) {
     remainingLetters: remainingLetters(allLetters).length,
   });
 }
+
 function broadcast(data) {
   players.forEach((player) => {
     player.ws.send(JSON.stringify(data));
