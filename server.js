@@ -13,7 +13,7 @@ const { checkWordWithHunspell } = require("./hunspell");
 const { Player } = require("./player");
 const { allLetters, buildBoard, someUnconfirmed } = require("./gameTools");
 
-let requiredPlayers = 2;
+let requiredPlayers = 3;
 let players = [];
 
 shuffle(allLetters);
@@ -95,6 +95,7 @@ function endGame(winner) {
   });
 
   broadcast({ type: "update-board", board: buildBoard(allLetters) });
+
   const playersLetterPoints = players.map((player) => {
     const letterPoints = allLetters
       .filter((letter) => letter.place === `player-${player.name}`)
@@ -366,10 +367,15 @@ wss.on("connection", (ws) => {
         theLetter.place = `board-${rowIndex}-${colIndex}`;
 
         if (desiredLetter) {
-          theLetter.letter = desiredLetter;
-          theLetter.points = letters.filter(
-            (l) => l.letter === theLetter.letter
+          theLetter.points = allLetters.filter(
+            (l) => l.letter === desiredLetter
           )[0].points;
+          // console.log(
+          //   theLetter,
+          //   allLetters.filter((l) => l.letter === theLetter.letter)[0]
+          // );
+          theLetter.letter = desiredLetter;
+          // console.log(theLetter);
           theLetter["isWid"] = true;
         }
         sendLetters();
