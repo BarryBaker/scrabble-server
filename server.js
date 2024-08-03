@@ -1,24 +1,29 @@
-const express = require("express");
-const http = require("http");
+// const express = require("express");
+// const http = require("http");
 const WebSocket = require("ws");
 
-const app = express();
-const server = http.createServer(app);
+// const app = express();
+// const server = http.createServer(app);
 const wss = new WebSocket.Server({ port: 3000 });
 
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader(
-    "Access-Control-Allow-Methods",
-    "GET, POST, OPTIONS, PUT, PATCH, DELETE"
-  );
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "X-Requested-With,content-type"
-  );
-  res.setHeader("Access-Control-Allow-Credentials", true);
-  next();
-});
+// Middleware to enable CORS
+// app.use((req, res, next) => {
+//   res.setHeader("Access-Control-Allow-Origin", "*");
+//   res.setHeader(
+//     "Access-Control-Allow-Methods",
+//     "GET, POST, OPTIONS, PUT, PATCH, DELETE"
+//   );
+//   res.setHeader(
+//     "Access-Control-Allow-Headers",
+//     "X-Requested-With,content-type"
+//   );
+//   res.setHeader("Access-Control-Allow-Credentials", true);
+//   next();
+// });
+// Basic route for HTTP requests to verify server is running
+// app.get("/", (req, res) => {
+//   res.send("Hello World! The server is running.");
+// });
 
 const {
   hasIsolatedLetters,
@@ -155,6 +160,7 @@ function endGame(winner) {
 }
 
 wss.on("connection", (ws) => {
+  // console.log("aaaa");
   ws.on("message", (message) => {
     const data = JSON.parse(message);
     const player = players.find((p) => p.name === data.player);
@@ -384,6 +390,13 @@ wss.on("connection", (ws) => {
         const { rowIndex, colIndex, id, desiredLetter } = data;
         const theLetter = allLetters.find((l) => l.id === Number(id));
 
+        // Check if thers a letter there already
+        if (
+          allLetters.find((l) => l.place === `board-${rowIndex}-${colIndex}`)
+        ) {
+          break;
+        }
+
         theLetter.place = `board-${rowIndex}-${colIndex}`;
 
         if (desiredLetter) {
@@ -456,3 +469,6 @@ wss.on("connection", (ws) => {
     }
   });
 });
+// server.listen(3000, () => {
+//   // console.log("Server is listening on port 3000");
+// });
