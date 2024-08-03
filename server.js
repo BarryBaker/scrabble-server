@@ -37,7 +37,7 @@ const { checkWordWithHunspell } = require("./hunspell");
 const { Player } = require("./player");
 const { allLetters, buildBoard, someUnconfirmed } = require("./gameTools");
 
-let requiredPlayers = 2;
+let requiredPlayers = 3;
 let players = [];
 
 shuffle(allLetters);
