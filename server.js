@@ -11,8 +11,13 @@ const {
 } = require("./utils");
 const { calculateScore } = require("./calcScore");
 const { checkWordWithHunspell } = require("./hunspell");
-const { Player } = require("./player");
-const { allLetters, buildBoard, someUnconfirmed } = require("./gameTools");
+// const { Player } = require("./player");
+const {
+  originalAllLetters,
+  buildBoard,
+  someUnconfirmed,
+} = require("./gameTools");
+let allLetters = structuredClone(originalAllLetters);
 
 let requiredPlayers = 2;
 let players = [];
@@ -89,7 +94,7 @@ function startGame() {
   broadcast({ type: "start-game" });
   broadcast({ type: "turn", player: players[firstToAct].name });
   playerInTurn = players[firstToAct].name;
-
+  // console.log(allLetters);
   broadcast({ type: "update-board", board: buildBoard(allLetters) });
 }
 
@@ -516,6 +521,15 @@ wss.on("connection", (ws) => {
           player: getNextPlayer(data.player, players),
         });
         playerInTurn = getNextPlayer(data.player, players);
+        break;
+      case "new":
+        requiredPlayers = data.playerCnt;
+        players = [];
+        playerInTurn = null;
+        lastPacked = [];
+        allLetters = structuredClone(originalAllLetters);
+        // console.log(originalAllLetters);
+        shuffle(allLetters);
         break;
     }
   });

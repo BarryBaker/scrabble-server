@@ -1,11 +1,11 @@
 const origi_board = require("./initialBoard");
 let letters = require("./letters");
 
-const allLetters = [];
+const originalAllLetters = [];
 let letterIdCounter = 1;
 letters.forEach((letter) => {
   for (let i = 0; i < letter.count; i++) {
-    allLetters.push({
+    originalAllLetters.push({
       id: letterIdCounter++,
       letter: letter.letter,
       points: letter.points,
@@ -53,6 +53,6 @@ function someUnconfirmed(allLetters) {
 
 module.exports = {
   buildBoard,
-  allLetters,
+  originalAllLetters,
   someUnconfirmed,
 };
