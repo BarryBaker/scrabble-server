@@ -19,6 +19,7 @@ letters.forEach((letter) => {
 function buildBoard(allLetters) {
   const board = origi_board.map((row) =>
     row.map((cell) => ({
+      id: null,
       letter: null,
       points: null,
       confirmed: null,
@@ -33,6 +34,7 @@ function buildBoard(allLetters) {
     const [_, row, col] = letterObj.place.split("-");
 
     board[parseInt(row)][parseInt(col)] = {
+      id: letterObj.id,
       letter: letterObj.letter,
       points: letterObj.isWild
         ? letters.filter((l) => l.letter === letterObj.letter)[0].points
@@ -48,6 +50,7 @@ function someUnconfirmed(allLetters) {
     (letter) => letter.place.startsWith("board") && !letter.confirmed
   );
 }
+
 module.exports = {
   buildBoard,
   allLetters,

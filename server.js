@@ -1,29 +1,6 @@
-// const express = require("express");
-// const http = require("http");
 const WebSocket = require("ws");
 
-// const app = express();
-// const server = http.createServer(app);
 const wss = new WebSocket.Server({ port: 3000 });
-
-// Middleware to enable CORS
-// app.use((req, res, next) => {
-//   res.setHeader("Access-Control-Allow-Origin", "*");
-//   res.setHeader(
-//     "Access-Control-Allow-Methods",
-//     "GET, POST, OPTIONS, PUT, PATCH, DELETE"
-//   );
-//   res.setHeader(
-//     "Access-Control-Allow-Headers",
-//     "X-Requested-With,content-type"
-//   );
-//   res.setHeader("Access-Control-Allow-Credentials", true);
-//   next();
-// });
-// Basic route for HTTP requests to verify server is running
-// app.get("/", (req, res) => {
-//   res.send("Hello World! The server is running.");
-// });
 
 const {
   hasIsolatedLetters,
@@ -37,8 +14,10 @@ const { checkWordWithHunspell } = require("./hunspell");
 const { Player } = require("./player");
 const { allLetters, buildBoard, someUnconfirmed } = require("./gameTools");
 
-let requiredPlayers = 3;
+let requiredPlayers = 2;
 let players = [];
+let playerInTurn = null;
+let lastPacked = [];
 
 shuffle(allLetters);
 
@@ -84,7 +63,20 @@ function sendLetters() {
     );
   });
 }
+function packBackLetters(player) {
+  allLetters.forEach((letter) => {
+    if (letter.place.startsWith("board") && !letter.confirmed) {
+      letter.place = `player-${player}`;
+      if (letter.isWild) {
+        letter.letter = "";
+        letter.points = null;
+      }
+    }
+  });
 
+  broadcast({ type: "update-board", board: buildBoard(allLetters) });
+  sendLetters();
+}
 function startGame() {
   // Deal letters
   players.forEach((player) => {
@@ -96,6 +88,7 @@ function startGame() {
 
   broadcast({ type: "start-game" });
   broadcast({ type: "turn", player: players[firstToAct].name });
+  playerInTurn = players[firstToAct].name;
 
   broadcast({ type: "update-board", board: buildBoard(allLetters) });
 }
@@ -189,7 +182,65 @@ wss.on("connection", (ws) => {
           }
         }
         break;
+      case "rejoin":
+        // let rejoinedPlayer = players.find((p) => p.name === data.name);
 
+        if (player) {
+          // if (player.name == playerInTurn) {
+          //   allLetters.forEach((letter) => {
+          //     if (letter.place.startsWith("board") && !letter.confirmed) {
+          //       letter.place = `player-${playerInTurn}`;
+          //       if (letter.isWild) {
+          //         letter.letter = "";
+          //         letter.points = null;
+          //       }
+          //     }
+          //   });
+          // }
+          // console.log(allLetters);
+          player.ws = ws; // Reassign the WebSocket connection
+          player.ws.send(
+            JSON.stringify({
+              type: "start-game",
+            })
+          );
+          // rejoinedPlayer.ws.send(
+          //   JSON.stringify({
+          //     type: "new-player",
+          //     name: rejoinedPlayer.name,
+          //   })
+          // );
+          broadcast({
+            type: "players",
+            players: players.map((p) => p.name),
+            requiredPlayers,
+          });
+          broadcast({ type: "update-board", board: buildBoard(allLetters) });
+          // fillLetters(player);
+          sendLetters();
+          broadcast({
+            type: "turn",
+            player: playerInTurn,
+          });
+          broadcast({
+            type: "update-score",
+            scores: players.reduce((acc, player) => {
+              acc[player.name] = player.score;
+              return acc;
+            }, {}),
+          });
+          broadcast({
+            type: "lastpacked",
+            lastPacked: lastPacked,
+          });
+          broadcast({
+            type: "remaining-letters",
+            remainingLetters: remainingLetters(allLetters).length,
+          });
+        } else {
+          // Handle new player joining logic
+        }
+        break;
       case "cancel-turn":
         allLetters.forEach((letter) => {
           if (letter.place.startsWith("board") && !letter.confirmed) {
@@ -284,32 +335,25 @@ wss.on("connection", (ws) => {
             type: "turn",
             player: getNextPlayer(data.player, players),
           });
+          playerInTurn = getNextPlayer(data.player, players);
           fillLetters(player);
+          // saveGameState(
+          //   allLetters,
+          //   players,
+          //   getNextPlayer(data.player, players)
+          // );
         }
-        function packBackLetters() {
-          allLetters.forEach((letter) => {
-            if (letter.place.startsWith("board") && !letter.confirmed) {
-              letter.place = `player-${data.player}`;
-              if (letter.isWild) {
-                letter.letter = "";
-                letter.points = null;
-              }
-            }
-          });
 
-          broadcast({ type: "update-board", board: buildBoard(allLetters) });
-          sendLetters();
-        }
         if (
           (classifiedWords.onlyConfirmed.length > 0 ||
             classifiedWords.mixed.length > 0) &&
           classifiedWords.onlyUnconfirmed.length > 0
         ) {
-          packBackLetters();
+          packBackLetters(data.player);
           break;
         }
         if (hasIsolatedLetters(allLetters)) {
-          packBackLetters();
+          packBackLetters(data.player);
           break;
         }
 
@@ -328,7 +372,7 @@ wss.on("connection", (ws) => {
           ) {
             goodWords.push(words[0]);
           } else {
-            packBackLetters();
+            packBackLetters(data.player);
             break;
           }
         } else {
@@ -347,14 +391,19 @@ wss.on("connection", (ws) => {
             if (validWords.length === allWords.length) {
               const score = calculateScore(goodWords);
               player.score += score;
-              if (
-                allLetters.filter(
-                  (letter) =>
-                    letter.place.startsWith("board") && !letter.confirmed
-                ).length === 7
-              ) {
+              const unConfirmeLetters = allLetters.filter(
+                (letter) =>
+                  letter.place.startsWith("board") && !letter.confirmed
+              );
+              if (unConfirmeLetters.length === 7) {
                 player.score += 50;
               }
+
+              lastPacked = [...unConfirmeLetters];
+              broadcast({
+                type: "lastpacked",
+                lastPacked: lastPacked,
+              });
 
               broadcast({
                 type: "update-score",
@@ -378,7 +427,7 @@ wss.on("connection", (ws) => {
               }
             } else {
               // console.log("Invalid words found: ", invalidWords);
-              packBackLetters();
+              packBackLetters(data.player);
             }
           })
           .catch((error) => {
@@ -433,6 +482,7 @@ wss.on("connection", (ws) => {
           type: "turn",
           player: getNextPlayer(data.player, players),
         });
+        playerInTurn = getNextPlayer(data.player, players);
         break;
       case "shuffle":
         if (someUnconfirmed(allLetters)) {
@@ -465,6 +515,7 @@ wss.on("connection", (ws) => {
           type: "turn",
           player: getNextPlayer(data.player, players),
         });
+        playerInTurn = getNextPlayer(data.player, players);
         break;
     }
   });
