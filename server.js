@@ -17,7 +17,7 @@ const {
   buildBoard,
   someUnconfirmed,
 } = require("./gameTools");
-let allLetters = structuredClone(originalAllLetters);
+let allLetters = JSON.parse(JSON.stringify(originalAllLetters));
 
 let requiredPlayers = 2;
 let players = [];
@@ -527,8 +527,8 @@ wss.on("connection", (ws) => {
         players = [];
         playerInTurn = null;
         lastPacked = [];
-        allLetters = structuredClone(originalAllLetters);
-        // console.log(originalAllLetters);
+        allLetters = JSON.parse(JSON.stringify(originalAllLetters));
+
         shuffle(allLetters);
         break;
     }
