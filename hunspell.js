@@ -7,7 +7,7 @@ function checkWordWithHunspell(word) {
       `echo "${word}" | hunspell -d hu_HU`, // Notice the -d hu_HU (no full path needed)
       (error, stdout, stderr) => {
         if (error) {
-          // console.log("a", stderr);
+          // console.log("a", stderr);aaaaaaa
           reject(error);
         } else {
           // console.log("b", stdout);
