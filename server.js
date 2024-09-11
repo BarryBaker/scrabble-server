@@ -539,87 +539,87 @@ wss.on("connection", (ws) => {
 //   // console.log("Server is listening on port 3000");
 // });
 
-const fs = require("fs");
+// const fs = require("fs");
 
-// Read .dic file and extract root words
-function extractWordsFromDic(dicFilePath) {
-  const fileContent = fs.readFileSync(dicFilePath, "utf-8");
+// // Read .dic file and extract root words
+// function extractWordsFromDic(dicFilePath) {
+//   const fileContent = fs.readFileSync(dicFilePath, "utf-8");
 
-  const lines = fileContent.split("\n").slice(1); // Ignore first line (word count)
+//   const lines = fileContent.split("\n").slice(1); // Ignore first line (word count)
 
-  const words = [];
-  for (let line of lines) {
-    // console.log(line);
+//   const words = [];
+//   for (let line of lines) {
+//     // console.log(line);
 
-    if (line.trim()) {
-      const rootWord = line.split("/")[0].split("\t")[0]; // Get root word before flag
-      if (
-        (rootWord[0] === rootWord[0].toLowerCase()) &
-        (rootWord.length < 10) &
-        (rootWord.length > 1)
-      ) {
-        words.push(rootWord);
-      }
-    }
-  }
-  return words;
-}
+//     if (line.trim()) {
+//       const rootWord = line.split("/")[0].split("\t")[0]; // Get root word before flag
+//       if (
+//         (rootWord[0] === rootWord[0].toLowerCase()) &
+//         (rootWord.length < 10) &
+//         (rootWord.length > 1)
+//       ) {
+//         words.push(rootWord);
+//       }
+//     }
+//   }
+//   return words;
+// }
 
-// Example usage
-const words = extractWordsFromDic("/usr/local/share/hunspell/hu_HU.dic");
-// console.log(words.length);
-// console.log(words);
+// // Example usage
+// const words = extractWordsFromDic("/usr/local/share/hunspell/hu_HU.dic");
+// // console.log(words.length);
+// // console.log(words);
 
-const fileContent = fs.readFileSync(
-  "/usr/local/share/hunspell/hu_HU.aff",
-  "utf-8"
-);
-const lines = fileContent.split("\n").slice(1); // Ignore first line (word count)
+// const fileContent = fs.readFileSync(
+//   "/usr/local/share/hunspell/hu_HU.aff",
+//   "utf-8"
+// );
+// const lines = fileContent.split("\n").slice(1); // Ignore first line (word count)
 
-const allwords = [];
-for (let l of lines) {
-  // console.log(l);
+// const allwords = [];
+// for (let l of lines) {
+//   // console.log(l);
 
-  for (let i of l.split(" ")) {
-    if ((i.startsWith("st") | i.startsWith("al")) & !i.includes("-")) {
-      const rootWord = i.split(":")[1];
-      if (rootWord != undefined) {
-        if (
-          (rootWord[0] === rootWord[0].toLowerCase()) &
-          (rootWord.length < 10) &
-          (rootWord.length > 1) &
-          !allwords.includes(rootWord)
-        ) {
-          allwords.push(rootWord);
-        }
-      }
-    }
-  }
-}
-const allWrods = allwords.concat(words);
+//   for (let i of l.split(" ")) {
+//     if ((i.startsWith("st") | i.startsWith("al")) & !i.includes("-")) {
+//       const rootWord = i.split(":")[1];
+//       if (rootWord != undefined) {
+//         if (
+//           (rootWord[0] === rootWord[0].toLowerCase()) &
+//           (rootWord.length < 10) &
+//           (rootWord.length > 1) &
+//           !allwords.includes(rootWord)
+//         ) {
+//           allwords.push(rootWord);
+//         }
+//       }
+//     }
+//   }
+// }
+// const allWrods = allwords.concat(words);
 
-function canFormWord(word, availableLetters) {
-  // Create a frequency map for available letters
-  const letterMap = availableLetters.reduce((map, letter) => {
-    map[letter] = (map[letter] || 0) + 1;
-    return map;
-  }, {});
+// function canFormWord(word, availableLetters) {
+//   // Create a frequency map for available letters
+//   const letterMap = availableLetters.reduce((map, letter) => {
+//     map[letter] = (map[letter] || 0) + 1;
+//     return map;
+//   }, {});
 
-  // Check if the word can be formed
-  for (let letter of word) {
-    if (!letterMap[letter] || letterMap[letter] === 0) {
-      return false; // Not enough letters or letter not available
-    }
-    letterMap[letter]--; // Use one letter
-  }
+//   // Check if the word can be formed
+//   for (let letter of word) {
+//     if (!letterMap[letter] || letterMap[letter] === 0) {
+//       return false; // Not enough letters or letter not available
+//     }
+//     letterMap[letter]--; // Use one letter
+//   }
 
-  return true; // Word can be formed
-}
+//   return true; // Word can be formed
+// }
 
-function filterWords(wordsList, availableLetters) {
-  // Filter words that can be formed with the given letters
-  return wordsList.filter((word) => canFormWord(word, availableLetters));
-}
+// function filterWords(wordsList, availableLetters) {
+//   // Filter words that can be formed with the given letters
+//   return wordsList.filter((word) => canFormWord(word, availableLetters));
+// }
 // console.log(allWrods.includes("m"));
 // console.log(filterWords(allWrods, ["r", "e", "t", "zs", "o", "m", "gy"]));
 
