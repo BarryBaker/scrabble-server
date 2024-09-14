@@ -148,7 +148,7 @@ wss.on("connection", (ws) => {
         }
         break;
       case "cancel-turn":
-        allLetters.forEach((letter) => {
+        room.allLetters.forEach((letter) => {
           if (letter.place.startsWith("board") && !letter.confirmed) {
             letter.place = `player-${data.player}`;
             if (letter.isWild) {
@@ -158,7 +158,7 @@ wss.on("connection", (ws) => {
           }
         });
 
-        broadcast({ type: "update-board", board: buildBoard(allLetters) });
+        room.broadcast({ type: "update-board", board: buildBoard(allLetters) });
         sendLetters();
         break;
 

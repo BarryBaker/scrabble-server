@@ -35,7 +35,14 @@ class Game {
       .filter((letter) => letter.place === "bag")
       .slice(0, lettersToFill);
     newLetters.forEach((letter) => (letter.place = `player-${player.name}`));
-    return player;
+    player.ws.send(
+      JSON.stringify({
+        type: "update-letters",
+        letters: this.allLetters.filter(
+          (letter) => letter.place === `player-${player.name}`
+        ),
+      })
+    );
   }
 
   broadcast(data) {
