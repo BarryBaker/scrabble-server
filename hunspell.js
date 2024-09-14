@@ -10,8 +10,6 @@ function checkWordWithHunspell(word) {
           // console.log("a", stderr);aaaaaaajo
           reject(error);
         } else {
-          // console.log("b", stdout);
-          // console.log(`Hunspell output for word "${word}":`, stdout, stderr);
           const isCorrect = stdout.includes("*") || stdout.includes("+");
           resolve(isCorrect);
         }

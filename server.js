@@ -1,13 +1,20 @@
 const WebSocket = require("ws");
+const Game = require("./game");
 
-const wss = new WebSocket.Server({ port: 3000 });
-//aaaaaa
+const cors = require("cors");
+const express = require("express");
+const http = require("http");
+const app = express(); // Create the Express app
+app.use(cors());
+
+const server = http.createServer(app); // Create HTTP server
+const wss = new WebSocket.Server({ server }); // Attach WebSocket to HTTP server
+
 const {
   hasIsolatedLetters,
   getNextPlayer,
   shuffle,
   remainingLetters,
-  // broadcast,
 } = require("./utils");
 const { calculateScore } = require("./calcScore");
 const { checkWordWithHunspell } = require("./hunspell");
@@ -17,86 +24,12 @@ const {
   buildBoard,
   someUnconfirmed,
 } = require("./gameTools");
-let allLetters = JSON.parse(JSON.stringify(originalAllLetters));
 
-let requiredPlayers = 2;
-let players = [];
-let playerInTurn = null;
-let lastPacked = [];
-
-shuffle(allLetters);
-
-function fillLetters(player) {
-  const playerLetters = allLetters.filter(
-    (letter) => letter.place === `player-${player.name}`
-  );
-  const lettersToFill = 7 - playerLetters.length;
-  const newLetters = allLetters
-    .filter((letter) => letter.place === "bag")
-    .slice(0, lettersToFill);
-  newLetters.forEach((letter) => (letter.place = `player-${player.name}`));
-
-  player.ws.send(
-    JSON.stringify({
-      type: "update-letters",
-      letters: allLetters.filter(
-        (letter) => letter.place === `player-${player.name}`
-      ),
-    })
-  );
-  broadcast({
-    type: "remaining-letters",
-    remainingLetters: remainingLetters(allLetters).length,
-  });
-}
-
-function broadcast(data) {
-  players.forEach((player) => {
-    player.ws.send(JSON.stringify(data));
-  });
-}
-
-function sendLetters() {
-  players.forEach((player) => {
-    player.ws.send(
-      JSON.stringify({
-        type: "update-letters",
-        letters: allLetters.filter(
-          (letter) => letter.place === `player-${player.name}`
-        ),
-      })
-    );
-  });
-}
-function packBackLetters(player) {
-  allLetters.forEach((letter) => {
-    if (letter.place.startsWith("board") && !letter.confirmed) {
-      letter.place = `player-${player}`;
-      if (letter.isWild) {
-        letter.letter = "";
-        letter.points = null;
-      }
-    }
-  });
-
-  broadcast({ type: "update-board", board: buildBoard(allLetters) });
-  sendLetters();
-}
-function startGame() {
-  // Deal letters
-  players.forEach((player) => {
-    fillLetters(player);
-  });
-
-  shuffle(players);
-  const firstToAct = Math.floor(Math.random() * players.length);
-
-  broadcast({ type: "start-game" });
-  broadcast({ type: "turn", player: players[firstToAct].name });
-  playerInTurn = players[firstToAct].name;
-  // console.log(allLetters);
-  broadcast({ type: "update-board", board: buildBoard(allLetters) });
-}
+const rooms = []; // Store all game instances
+app.get("/rooms", (req, res) => {
+  // console.log(res.json(games));
+  res.json(rooms);
+});
 
 // Function to check words using hunspell
 async function validateWords(words) {
@@ -110,82 +43,50 @@ async function validateWords(words) {
   return validWords;
 }
 
-function endGame(winner) {
-  allLetters.forEach((letter) => {
-    if (letter.place.startsWith("board")) {
-      letter.confirmed = true;
-    }
-  });
-
-  broadcast({ type: "update-board", board: buildBoard(allLetters) });
-
-  const playersLetterPoints = players.map((player) => {
-    const letterPoints = allLetters
-      .filter((letter) => letter.place === `player-${player.name}`)
-      .reduce((total, letter) => total + letter.points, 0);
-
-    return {
-      name: player.name,
-      letterPoints: letterPoints,
-    };
-  });
-
-  players.forEach((player) => {
-    const playerLetterPoints = playersLetterPoints.find(
-      (p) => p.name === player.name
-    ).letterPoints;
-    player.score -= playerLetterPoints;
-  });
-
-  if (winner) {
-    const totalRemainingPoints = playersLetterPoints.reduce(
-      (sum, player) => sum + player.letterPoints,
-      0
-    );
-    const winnerPlayer = players.find((p) => p.name === winner);
-    winnerPlayer.score += totalRemainingPoints;
-  }
-  broadcast({
-    type: "update-score",
-    scores: players.reduce((acc, player) => {
-      acc[player.name] = player.score;
-      return acc;
-    }, {}),
-  });
-  broadcast({
-    type: "end-game",
-  });
-}
-
 wss.on("connection", (ws) => {
-  // console.log("aaaa");
   ws.on("message", (message) => {
     const data = JSON.parse(message);
-    const player = players.find((p) => p.name === data.player);
+    const room = rooms.find((r) => r.roomId === data.roomId);
+    const player = room
+      ? room.players.find((p) => p.name === data.player)
+      : null;
 
+    const name = data.name;
     switch (data.type) {
+      case "create-game":
+        const roomId =
+          rooms.reduce((max, room) => {
+            return room.roomId > max ? room.roomId : max;
+          }, 0) + 1;
+
+        rooms.push(new Game(roomId, name || `Room ${roomId}`, data.playerCnt));
+
+        ws.send(JSON.stringify({ type: "game-created" }));
+        break;
       case "join":
-        if (!players.some((player) => player.ws === ws)) {
-          const newName = data.name || `Player ${players.length + 1}`;
+        const newPlayer = {
+          name: name || `Player ${room.players.length + 1}`,
+          ws,
+          score: 0,
+          surrendered: false,
+        };
 
-          const newPlayer = { name: newName, ws, score: 0, surrendered: false };
-          players.push(newPlayer);
-          newPlayer.ws.send(
-            JSON.stringify({
-              type: "new-player",
-              name: newPlayer.name,
-            })
-          );
+        room.players.push(newPlayer);
+        newPlayer.ws.send(
+          JSON.stringify({
+            type: "new-player",
+            name: newPlayer.name,
+          })
+        );
 
-          if (players.length === requiredPlayers) {
-            broadcast({
-              type: "players",
-              players: players.map((p) => p.name),
-              requiredPlayers,
-            });
-            startGame();
-          }
+        if (room.players.length === room.requiredPlayers) {
+          room.broadcast({
+            type: "players",
+            players: room.players.map((p) => p.name),
+          });
+          room.startGame();
         }
+
         break;
       case "rejoin":
         // let rejoinedPlayer = players.find((p) => p.name === data.name);
@@ -390,9 +291,9 @@ wss.on("connection", (ws) => {
 
         validateWords(allWords)
           .then((validWords) => {
-            const invalidWords = allWords.filter(
-              (word) => !validWords.includes(word)
-            );
+            // const invalidWords = allWords.filter(
+            //   (word) => !validWords.includes(word)
+            // );
 
             if (validWords.length === allWords.length) {
               const score = calculateScore(goodWords);
@@ -534,6 +435,9 @@ wss.on("connection", (ws) => {
         break;
     }
   });
+});
+server.listen(3000, () => {
+  console.log("Server is listening on port 3000");
 });
 // server.listen(3000, () => {
 //   // console.log("Server is listening on port 3000");
