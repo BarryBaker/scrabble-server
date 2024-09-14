@@ -54,7 +54,7 @@ class Game {
     this.broadcast({ type: "start-game", roomId: this.roomId });
     this.broadcast({ type: "turn", player: this.players[firstToAct].name });
     this.playerInTurn = this.players[firstToAct].name;
-    // console.log(allLetters);
+
     this.broadcast({
       type: "update-board",
       board: buildBoard(this.allLetters),
