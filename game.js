@@ -1,12 +1,7 @@
 const { calculateScore } = require("./calcScore");
 const { checkWordWithHunspell } = require("./hunspell");
 const { buildBoard, originalAllLetters } = require("./gameTools");
-const {
-  getNextPlayer,
-  shuffle,
-  remainingLetters,
-  hasIsolatedLetters,
-} = require("./utils");
+const { shuffle, remainingLetters, hasIsolatedLetters } = require("./utils");
 
 class Game {
   constructor(roomId, roomName, requiredPlayers = 2) {
@@ -50,7 +45,18 @@ class Game {
       player.ws.send(JSON.stringify(data));
     });
   }
-
+  sendLetters() {
+    this.players.forEach((player) => {
+      player.ws.send(
+        JSON.stringify({
+          type: "update-letters",
+          letters: this.allLetters.filter(
+            (letter) => letter.place === `player-${player.name}`
+          ),
+        })
+      );
+    });
+  }
   startGame() {
     shuffle(this.players);
 
@@ -78,9 +84,12 @@ class Game {
       }
     });
 
-    broadcast({ type: "update-board", board: buildBoard(this.allLetters) });
+    this.broadcast({
+      type: "update-board",
+      board: buildBoard(this.allLetters),
+    });
 
-    const playersLetterPoints = players.map((player) => {
+    const playersLetterPoints = this.players.map((player) => {
       const letterPoints = this.allLetters
         .filter((letter) => letter.place === `player-${player.name}`)
         .reduce((total, letter) => total + letter.points, 0);
@@ -91,7 +100,7 @@ class Game {
       };
     });
 
-    players.forEach((player) => {
+    this.players.forEach((player) => {
       const playerLetterPoints = playersLetterPoints.find(
         (p) => p.name === player.name
       ).letterPoints;
@@ -103,17 +112,17 @@ class Game {
         (sum, player) => sum + player.letterPoints,
         0
       );
-      const winnerPlayer = players.find((p) => p.name === winner);
+      const winnerPlayer = this.players.find((p) => p.name === winner);
       winnerPlayer.score += totalRemainingPoints;
     }
-    broadcast({
+    this.broadcast({
       type: "update-score",
-      scores: players.reduce((acc, player) => {
+      scores: this.players.reduce((acc, player) => {
         acc[player.name] = player.score;
         return acc;
       }, {}),
     });
-    broadcast({
+    this.broadcast({
       type: "end-game",
     });
   }

@@ -4,7 +4,7 @@ const Game = require("./game");
 const cors = require("cors");
 const express = require("express");
 const http = require("http");
-const app = express(); // Create the Express app
+const app = express();
 app.use(cors());
 
 const server = http.createServer(app); // Create HTTP server
@@ -15,19 +15,18 @@ const {
   getNextPlayer,
   shuffle,
   remainingLetters,
+  removeRoomById,
 } = require("./utils");
 const { calculateScore } = require("./calcScore");
 const { checkWordWithHunspell } = require("./hunspell");
-// const { Player } = require("./player");
 const {
   originalAllLetters,
   buildBoard,
   someUnconfirmed,
 } = require("./gameTools");
 
-const rooms = []; // Store all game instances
+const rooms = [];
 app.get("/rooms", (req, res) => {
-  // console.log(res.json(games));
   res.json(rooms);
 });
 
@@ -46,12 +45,13 @@ async function validateWords(words) {
 wss.on("connection", (ws) => {
   ws.on("message", (message) => {
     const data = JSON.parse(message);
-    const room = rooms.find((r) => r.roomId === data.roomId);
+    const room = rooms.find((r) => r.roomId === Number(data.roomId));
+
     const player = room
       ? room.players.find((p) => p.name === data.player)
       : null;
-
     const name = data.name;
+
     switch (data.type) {
       case "create-game":
         const roomId =
@@ -60,9 +60,9 @@ wss.on("connection", (ws) => {
           }, 0) + 1;
 
         rooms.push(new Game(roomId, name || `Room ${roomId}`, data.playerCnt));
-
         ws.send(JSON.stringify({ type: "game-created" }));
         break;
+
       case "join":
         const newPlayer = {
           name: name || `Player ${room.players.length + 1}`,
@@ -76,6 +76,7 @@ wss.on("connection", (ws) => {
           JSON.stringify({
             type: "new-player",
             name: newPlayer.name,
+            roomId: room.roomId,
           })
         );
 
@@ -88,60 +89,46 @@ wss.on("connection", (ws) => {
         }
 
         break;
-      case "rejoin":
-        // let rejoinedPlayer = players.find((p) => p.name === data.name);
-
+      case "reconnect":
         if (player) {
-          // if (player.name == playerInTurn) {
-          //   allLetters.forEach((letter) => {
-          //     if (letter.place.startsWith("board") && !letter.confirmed) {
-          //       letter.place = `player-${playerInTurn}`;
-          //       if (letter.isWild) {
-          //         letter.letter = "";
-          //         letter.points = null;
-          //       }
-          //     }
-          //   });
-          // }
-          // console.log(allLetters);
           player.ws = ws; // Reassign the WebSocket connection
+
           player.ws.send(
             JSON.stringify({
               type: "start-game",
+              roomId: room.roomId,
             })
           );
-          // rejoinedPlayer.ws.send(
-          //   JSON.stringify({
-          //     type: "new-player",
-          //     name: rejoinedPlayer.name,
-          //   })
-          // );
-          broadcast({
+
+          room.broadcast({
             type: "players",
-            players: players.map((p) => p.name),
-            requiredPlayers,
+            players: room.players.map((p) => p.name),
+            requiredPlayers: room.requiredPlayers,
           });
-          broadcast({ type: "update-board", board: buildBoard(allLetters) });
+          room.broadcast({
+            type: "update-board",
+            board: buildBoard(room.allLetters),
+          });
           // fillLetters(player);
-          sendLetters();
-          broadcast({
+          room.sendLetters();
+          room.broadcast({
             type: "turn",
-            player: playerInTurn,
+            player: room.playerInTurn,
           });
-          broadcast({
+          room.broadcast({
             type: "update-score",
-            scores: players.reduce((acc, player) => {
+            scores: room.players.reduce((acc, player) => {
               acc[player.name] = player.score;
               return acc;
             }, {}),
           });
-          broadcast({
+          room.broadcast({
             type: "lastpacked",
-            lastPacked: lastPacked,
+            lastPacked: room.lastPacked,
           });
-          broadcast({
+          room.broadcast({
             type: "remaining-letters",
-            remainingLetters: remainingLetters(allLetters).length,
+            remainingLetters: remainingLetters(room.allLetters).length,
           });
         } else {
           // Handle new player joining logic
@@ -158,8 +145,11 @@ wss.on("connection", (ws) => {
           }
         });
 
-        room.broadcast({ type: "update-board", board: buildBoard(allLetters) });
-        sendLetters();
+        room.broadcast({
+          type: "update-board",
+          board: buildBoard(room.allLetters),
+        });
+        room.sendLetters();
         break;
 
       case "turn":
@@ -169,7 +159,7 @@ wss.on("connection", (ws) => {
         );
 
         // Place the letters on the board
-        const boardLetters = allLetters.filter((letter) =>
+        const boardLetters = room.allLetters.filter((letter) =>
           letter.place.startsWith("board")
         );
         for (let letterObj of boardLetters) {
@@ -230,24 +220,22 @@ wss.on("connection", (ws) => {
         }
 
         function continueGame() {
-          allLetters.forEach((letter) => {
+          room.allLetters.forEach((letter) => {
             if (letter.place.startsWith("board")) {
               letter.confirmed = true;
             }
           });
 
-          broadcast({ type: "update-board", board: buildBoard(allLetters) });
-          broadcast({
-            type: "turn",
-            player: getNextPlayer(data.player, players),
+          room.broadcast({
+            type: "update-board",
+            board: buildBoard(room.allLetters),
           });
-          playerInTurn = getNextPlayer(data.player, players);
-          fillLetters(player);
-          // saveGameState(
-          //   allLetters,
-          //   players,
-          //   getNextPlayer(data.player, players)
-          // );
+          room.broadcast({
+            type: "turn",
+            player: getNextPlayer(data.player, room.players),
+          });
+          playerInTurn = getNextPlayer(data.player, room.players);
+          room.fillLetters(player);
         }
 
         if (
@@ -255,11 +243,11 @@ wss.on("connection", (ws) => {
             classifiedWords.mixed.length > 0) &&
           classifiedWords.onlyUnconfirmed.length > 0
         ) {
-          packBackLetters(data.player);
+          room.packBackLetters(data.player);
           break;
         }
-        if (hasIsolatedLetters(allLetters)) {
-          packBackLetters(data.player);
+        if (hasIsolatedLetters(room.allLetters)) {
+          room.packBackLetters(data.player);
           break;
         }
 
@@ -298,7 +286,7 @@ wss.on("connection", (ws) => {
             if (validWords.length === allWords.length) {
               const score = calculateScore(goodWords);
               player.score += score;
-              const unConfirmeLetters = allLetters.filter(
+              const unConfirmeLetters = room.allLetters.filter(
                 (letter) =>
                   letter.place.startsWith("board") && !letter.confirmed
               );
@@ -306,15 +294,15 @@ wss.on("connection", (ws) => {
                 player.score += 50;
               }
 
-              lastPacked = [...unConfirmeLetters];
-              broadcast({
+              room.lastPacked = [...unConfirmeLetters];
+              room.broadcast({
                 type: "lastpacked",
-                lastPacked: lastPacked,
+                lastPacked: room.lastPacked,
               });
 
-              broadcast({
+              room.broadcast({
                 type: "update-score",
-                scores: players.reduce((acc, player) => {
+                scores: room.players.reduce((acc, player) => {
                   acc[player.name] = player.score;
                   return acc;
                 }, {}),
@@ -322,19 +310,20 @@ wss.on("connection", (ws) => {
 
               //Check if game ends
               if (
-                allLetters.filter(
+                room.allLetters.filter(
                   (letter) => letter.place === `player-${data.player}`
                 ).length === 0 &&
-                allLetters.filter((letter) => letter.place === "bag").length ===
-                  0
+                room.allLetters.filter((letter) => letter.place === "bag")
+                  .length === 0
               ) {
-                endGame(data.player);
+                room.endGame(data.player);
+                removeRoomById(rooms, room.roomId);
               } else {
                 continueGame();
               }
             } else {
               // console.log("Invalid words found: ", invalidWords);
-              packBackLetters(data.player);
+              room.packBackLetters(data.player);
             }
           })
           .catch((error) => {
@@ -344,11 +333,13 @@ wss.on("connection", (ws) => {
 
       case "update-board-cell":
         const { rowIndex, colIndex, id, desiredLetter } = data;
-        const theLetter = allLetters.find((l) => l.id === Number(id));
+        const theLetter = room.allLetters.find((l) => l.id === Number(id));
 
         // Check if thers a letter there already
         if (
-          allLetters.find((l) => l.place === `board-${rowIndex}-${colIndex}`)
+          room.allLetters.find(
+            (l) => l.place === `board-${rowIndex}-${colIndex}`
+          )
         ) {
           break;
         }
@@ -356,46 +347,46 @@ wss.on("connection", (ws) => {
         theLetter.place = `board-${rowIndex}-${colIndex}`;
 
         if (desiredLetter) {
-          theLetter.points = allLetters.filter(
+          theLetter.points = room.allLetters.filter(
             (l) => l.letter === desiredLetter
           )[0].points;
-          // console.log(
-          //   theLetter,
-          //   allLetters.filter((l) => l.letter === theLetter.letter)[0]
-          // );
+
           theLetter.letter = desiredLetter;
-          // console.log(theLetter);
+
           theLetter["isWid"] = true;
         }
-        sendLetters();
+        room.sendLetters();
 
-        broadcast({ type: "update-board", board: buildBoard(allLetters) });
+        room.broadcast({
+          type: "update-board",
+          board: buildBoard(room.allLetters),
+        });
 
         break;
       case "change-all-letters":
-        if (someUnconfirmed(allLetters)) {
+        if (someUnconfirmed(room.allLetters)) {
           break;
         }
 
-        allLetters.forEach((letter) => {
+        room.allLetters.forEach((letter) => {
           if (letter.place === `player-${player.name}`) {
             letter.place = "bag";
           }
         });
 
-        shuffle(allLetters);
-        fillLetters(player);
-        broadcast({
+        shuffle(room.allLetters);
+        room.fillLetters(player);
+        room.broadcast({
           type: "turn",
-          player: getNextPlayer(data.player, players),
+          player: getNextPlayer(data.player, room.players),
         });
-        playerInTurn = getNextPlayer(data.player, players);
+        room.playerInTurn = getNextPlayer(data.player, room.players);
         break;
       case "shuffle":
-        if (someUnconfirmed(allLetters)) {
+        if (someUnconfirmed(room.allLetters)) {
           break;
         }
-        const playerLetters = allLetters.filter(
+        const playerLetters = room.allLetters.filter(
           (letter) => letter.place === `player-${player.name}`
         );
 
@@ -408,299 +399,35 @@ wss.on("connection", (ws) => {
         );
         break;
       case "surrender":
-        if (someUnconfirmed(allLetters)) {
+        if (someUnconfirmed(room.allLetters)) {
           break;
         }
-        const theplayer = players.find((p) => p.name === data.player);
-        theplayer.surrendered = true;
-        if (players.every((p) => p.surrendered)) {
-          endGame();
+        // const theplayer = players.find((p) => p.name === data.player);
+        player.surrendered = true;
+        if (room.players.every((p) => p.surrendered)) {
+          room.endGame();
+          removeRoomById(rooms, room.roomId);
           break;
         }
 
-        broadcast({
+        room.broadcast({
           type: "turn",
-          player: getNextPlayer(data.player, players),
+          player: getNextPlayer(data.player, room.players),
         });
-        playerInTurn = getNextPlayer(data.player, players);
+        room.playerInTurn = getNextPlayer(data.player, room.players);
         break;
-      case "new":
-        requiredPlayers = data.playerCnt;
-        players = [];
-        playerInTurn = null;
-        lastPacked = [];
-        allLetters = JSON.parse(JSON.stringify(originalAllLetters));
+      // case "new":
+      //   requiredPlayers = data.playerCnt;
+      //   players = [];
+      //   playerInTurn = null;
+      //   lastPacked = [];
+      //   allLetters = JSON.parse(JSON.stringify(originalAllLetters));
 
-        shuffle(allLetters);
-        break;
+      //   shuffle(allLetters);
+      //   break;
     }
   });
 });
 server.listen(3000, () => {
   console.log("Server is listening on port 3000");
 });
-// server.listen(3000, () => {
-//   // console.log("Server is listening on port 3000");
-// });
-
-// const fs = require("fs");
-
-// // Read .dic file and extract root words
-// function extractWordsFromDic(dicFilePath) {
-//   const fileContent = fs.readFileSync(dicFilePath, "utf-8");
-
-//   const lines = fileContent.split("\n").slice(1); // Ignore first line (word count)
-
-//   const words = [];
-//   for (let line of lines) {
-//     // console.log(line);
-
-//     if (line.trim()) {
-//       const rootWord = line.split("/")[0].split("\t")[0]; // Get root word before flag
-//       if (
-//         (rootWord[0] === rootWord[0].toLowerCase()) &
-//         (rootWord.length < 10) &
-//         (rootWord.length > 1)
-//       ) {
-//         words.push(rootWord);
-//       }
-//     }
-//   }
-//   return words;
-// }
-
-// // Example usage
-// const words = extractWordsFromDic("/usr/local/share/hunspell/hu_HU.dic");
-// // console.log(words.length);
-// // console.log(words);
-
-// const fileContent = fs.readFileSync(
-//   "/usr/local/share/hunspell/hu_HU.aff",
-//   "utf-8"
-// );
-// const lines = fileContent.split("\n").slice(1); // Ignore first line (word count)
-
-// const allwords = [];
-// for (let l of lines) {
-//   // console.log(l);
-
-//   for (let i of l.split(" ")) {
-//     if ((i.startsWith("st") | i.startsWith("al")) & !i.includes("-")) {
-//       const rootWord = i.split(":")[1];
-//       if (rootWord != undefined) {
-//         if (
-//           (rootWord[0] === rootWord[0].toLowerCase()) &
-//           (rootWord.length < 10) &
-//           (rootWord.length > 1) &
-//           !allwords.includes(rootWord)
-//         ) {
-//           allwords.push(rootWord);
-//         }
-//       }
-//     }
-//   }
-// }
-// const allWrods = allwords.concat(words);
-
-// function canFormWord(word, availableLetters) {
-//   // Create a frequency map for available letters
-//   const letterMap = availableLetters.reduce((map, letter) => {
-//     map[letter] = (map[letter] || 0) + 1;
-//     return map;
-//   }, {});
-
-//   // Check if the word can be formed
-//   for (let letter of word) {
-//     if (!letterMap[letter] || letterMap[letter] === 0) {
-//       return false; // Not enough letters or letter not available
-//     }
-//     letterMap[letter]--; // Use one letter
-//   }
-
-//   return true; // Word can be formed
-// }
-
-// function filterWords(wordsList, availableLetters) {
-//   // Filter words that can be formed with the given letters
-//   return wordsList.filter((word) => canFormWord(word, availableLetters));
-// }
-// console.log(allWrods.includes("m"));
-// console.log(filterWords(allWrods, ["r", "e", "t", "zs", "o", "m", "gy"]));
-
-// function parseAffixFile(affFilePath) {
-//   const affixData = fs.readFileSync(affFilePath, "utf-8").split("\n");
-//   const affixRules = {};
-
-//   affixData.forEach((line) => {
-//     const parts = line.split(/\s+/);
-//     if (parts[0] === "SFX" || parts[0] === "PFX") {
-//       const type = parts[0]; // SFX (suffix) or PFX (prefix)
-//       const ruleName = parts[1]; // Rule name (e.g., A)
-//       const strip = parts[2]; // The part of the word to strip (or 0 if none)
-//       const affix = parts[3]; // The affix to apply
-//       const condition = parts[4]; // Condition (e.g., pattern matching)
-
-//       if (!affixRules[ruleName]) {
-//         affixRules[ruleName] = [];
-//       }
-//       affixRules[ruleName].push({
-//         type,
-//         strip,
-//         affix,
-//         condition,
-//       });
-//     }
-//   });
-
-//   return affixRules;
-// }
-
-// // Example usage
-// const affixRules = parseAffixFile("/usr/local/share/hunspell/hu_HU.aff");
-// // console.log(affixRules["n"]);
-// console.log(Object.keys(affixRules));
-
-// function applyAffixesToWord(rootWord, affixRules) {
-//   let wordForms = [rootWord]; // Start with the root word
-
-//   // Iterate through each affix rule
-//   // console.log(affixRules);
-//   Object.keys(affixRules).forEach((ruleName) => {
-//     affixRules[ruleName].forEach((rule) => {
-//       // console.log(rule);
-//       const { type, strip, affix, condition } = rule;
-//       console.log(rule);
-//       // Check if the word satisfies the condition (using regex)
-//       const regexCondition = condition ? condition : ".*"; // Match everything if condition is undefined
-
-//       const regex = new RegExp(regexCondition.replace("-", "\\-"));
-//       if (regex.test(rootWord)) {
-//         let modifiedWord = rootWord;
-
-//         // Apply stripping if necessary
-//         if (strip !== "0") {
-//           const stripRegex = new RegExp(`${strip}$`);
-//           modifiedWord = modifiedWord.replace(stripRegex, "");
-//           modifiedWord = modifiedWord.split("/")[0];
-//         }
-
-//         // Add the prefix or suffix
-//         if (type === "SFX") {
-//           modifiedWord += affix; // Add suffix
-//         } else if (type === "PFX") {
-//           modifiedWord = affix + modifiedWord; // Add prefix
-//         }
-//         console.log(modifiedWord);
-//         wordForms.push(modifiedWord);
-//       }
-//     });
-//   });
-
-//   return wordForms;
-// }
-
-// // Example usage
-// const rootWord = "alma";
-// const affixForms = applyAffixesToWord(rootWord, affixRules);
-// console.log(affixForms);
-
-// checkWordWithHunspell("kirávonzó").then((e) => {
-//   console.log(e);
-// });
-
-// const hungarianAlphabet = [
-//   "a",
-//   "á",
-//   "b",
-//   "c",
-//   "cs",
-//   "d",
-//   "dz",
-//   "dzs",
-//   "e",
-//   "é",
-//   "f",
-//   "g",
-//   "gy",
-//   "h",
-//   "i",
-//   "í",
-//   "j",
-//   "k",
-//   "l",
-//   "ly",
-//   "m",
-//   "n",
-//   "ny",
-//   "o",
-//   "ó",
-//   "ö",
-//   "ő",
-//   "p",
-//   "q",
-//   "r",
-//   "s",
-//   "sz",
-//   "t",
-//   "ty",
-//   "u",
-//   "ú",
-//   "ü",
-//   "ű",
-//   "v",
-//   "w",
-//   "x",
-//   "y",
-//   "z",
-//   "zs",
-// ];
-
-// // const combinations = [];
-// // for (let i = 0; i < hungarianAlphabet.length; i++) {
-// //   for (let j = 0; j < hungarianAlphabet.length; j++) {
-// //     for (let k = 0; k < hungarianAlphabet.length; k++) {
-// //       const w =
-// //         hungarianAlphabet[i] + hungarianAlphabet[j] + hungarianAlphabet[k];
-// //       console.log(w);
-// //       checkWordWithHunspell(w).then((e) => {
-// //         console.log(w, e);
-// //         // if (e) {
-// //         //   console.log(w);
-// //         //   combinations.push(w);
-// //         // }
-// //       });
-// //     }
-// //   }
-// // }
-// async function validateWords() {
-//   const promises = [];
-//   const validWords = [];
-//   for (let i = 0; i < hungarianAlphabet.length; i++) {
-//     for (let j = 0; j < hungarianAlphabet.length; j++) {
-//       // for (let k = 0; k < hungarianAlphabet.length; k++) {
-//       const w = hungarianAlphabet[i] + hungarianAlphabet[j]; //+ hungarianAlphabet[k];
-//       // console.log(w);
-//       promises.push(checkWordWithHunspell(w));
-//       // const isValid = await checkWordWithHunspell(w); // Wait for Hunspell check
-//       // if (isValid) {
-//       //   validWords.push(w);
-//       //   console.log(`Valid word: ${w}`);
-//       // } else {
-//       //   // console.log(`Invalid word: ${w}`);
-//       // }
-//     }
-//   }
-//   // }
-//   const results = await Promise.all(promises);
-
-//   // Filter and log the valid words
-//   results.forEach(({ word, isCorrect }) => {
-//     if (isCorrect) {
-//       validWords.push(word);
-//       console.log(`Valid word: ${word}`);
-//     }
-//   });
-//   // Once all words are processed
-//   // console.log("All valid 3-letter Hungarian words:", validWords);
-// }
-// // validateWords();

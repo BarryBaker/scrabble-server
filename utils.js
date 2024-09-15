@@ -54,10 +54,17 @@ function remainingLetters(letters) {
   return letters.filter((letter) => letter.place === "bag");
 }
 
+function removeRoomById(roomsArray, roomId) {
+  const index = roomsArray.findIndex((room) => room.roomId === roomId);
+  if (index !== -1) {
+    roomsArray.splice(index, 1); // Removes the element in place
+  }
+}
+
 module.exports = {
   hasIsolatedLetters,
   getNextPlayer,
   shuffle,
   remainingLetters,
-  // broadcast,
+  removeRoomById,
 };
