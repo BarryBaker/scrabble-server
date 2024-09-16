@@ -91,7 +91,7 @@ wss.on("connection", (ws) => {
         break;
       case "reconnect":
         if (player) {
-          player.ws = ws; // Reassign the WebSocket connection
+          player.ws = ws; // Reassign the WebSocket connectionn
 
           player.ws.send(
             JSON.stringify({
