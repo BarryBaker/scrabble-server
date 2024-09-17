@@ -323,6 +323,7 @@ wss.on("connection", (ws) => {
               }
             } else {
               // console.log("Invalid words found: ", invalidWords);
+
               room.packBackLetters(data.player);
             }
           })
