@@ -279,6 +279,7 @@ wss.on("connection", (ws) => {
 
         validateWords(allWords)
           .then((validWords) => {
+            console.log(allWords, validWords);
             // const invalidWords = allWords.filter(
             //   (word) => !validWords.includes(word)
             // );
