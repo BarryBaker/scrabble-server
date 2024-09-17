@@ -234,7 +234,7 @@ wss.on("connection", (ws) => {
             type: "turn",
             player: getNextPlayer(data.player, room.players),
           });
-          playerInTurn = getNextPlayer(data.player, room.players);
+          room.playerInTurn = getNextPlayer(data.player, room.players);
           room.fillLetters(player);
         }
 
