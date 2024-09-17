@@ -700,9 +700,9 @@ wss.on("connection", (ws) => {
 // const affixForms = applyAffixesToWord(rootWord, affixRules);
 // console.log(affixForms);
 
-// checkWordWithHunspell("kirávonzó").then((e) => {
-//   console.log(e);
-// });
+checkWordWithHunspell("híméd").then((e) => {
+  console.log(e);
+});
 
 // const hungarianAlphabet = [
 //   "a",
