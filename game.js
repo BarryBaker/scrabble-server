@@ -1,7 +1,7 @@
 const { calculateScore } = require("./calcScore");
 const { checkWordWithHunspell } = require("./hunspell");
 const { buildBoard, originalAllLetters } = require("./gameTools");
-const { shuffle, remainingLetters, hasIsolatedLetters } = require("./utils");
+const { shuffle, hasIsolatedLetters } = require("./utils");
 
 class Game {
   constructor(roomId, roomName, requiredPlayers = 2) {
