@@ -1,7 +1,7 @@
 const { calculateScore } = require("./calcScore");
 const { checkWordWithHunspell } = require("./hunspell");
 const { buildBoard, originalAllLetters } = require("./gameTools");
-const { shuffle, hasIsolatedLetters } = require("./utils");
+const { shuffle, remainingLetters, hasIsolatedLetters } = require("./utils");
 
 class Game {
   constructor(roomId, roomName, requiredPlayers = 2) {
@@ -38,6 +38,10 @@ class Game {
         ),
       })
     );
+    this.broadcast({
+      type: "remaining-letters",
+      remainingLetters: remainingLetters(this.allLetters).length,
+    });
   }
 
   broadcast(data) {
