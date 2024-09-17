@@ -140,6 +140,11 @@ class Game {
         }
       }
     });
+    this.broadcast({
+      type: "update-board",
+      board: buildBoard(this.allLetters),
+    });
+    this.sendLetters();
   }
 
   //   validateWords(words) {
