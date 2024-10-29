@@ -1,4 +1,4 @@
-const letters = [
+const letters_hu_HU = [
   { letter: "", points: null, count: 2 },
   { letter: "A", points: 1, count: 6 },
   { letter: "E", points: 1, count: 6 },
@@ -40,4 +40,64 @@ const letters = [
   { letter: "TY", points: 10, count: 1 },
 ];
 
-module.exports = letters;
+const letters_en_GB = [
+  { letter: "", points: null, count: 2 }, // Blank tiles
+  { letter: "E", points: 1, count: 12 },
+  { letter: "A", points: 1, count: 9 },
+  { letter: "I", points: 1, count: 9 },
+  { letter: "O", points: 1, count: 8 },
+  { letter: "N", points: 1, count: 6 },
+  { letter: "R", points: 1, count: 6 },
+  { letter: "T", points: 1, count: 6 },
+  { letter: "L", points: 1, count: 4 },
+  { letter: "S", points: 1, count: 4 },
+  { letter: "U", points: 1, count: 4 },
+  { letter: "D", points: 2, count: 4 },
+  { letter: "G", points: 2, count: 3 },
+  { letter: "B", points: 3, count: 2 },
+  { letter: "C", points: 3, count: 2 },
+  { letter: "M", points: 3, count: 2 },
+  { letter: "P", points: 3, count: 2 },
+  { letter: "F", points: 4, count: 2 },
+  { letter: "H", points: 4, count: 2 },
+  { letter: "V", points: 4, count: 2 },
+  { letter: "W", points: 4, count: 2 },
+  { letter: "Y", points: 4, count: 2 },
+  { letter: "K", points: 5, count: 1 },
+  { letter: "J", points: 8, count: 1 },
+  { letter: "X", points: 8, count: 1 },
+  { letter: "Q", points: 10, count: 1 },
+  { letter: "Z", points: 10, count: 1 },
+];
+
+const letters_nl_NL = [
+  { letter: "", points: null, count: 2 }, // Blank tiles
+  { letter: "E", points: 1, count: 18 },
+  { letter: "N", points: 1, count: 10 },
+  { letter: "A", points: 1, count: 6 },
+  { letter: "O", points: 1, count: 6 },
+  { letter: "I", points: 1, count: 4 },
+  { letter: "D", points: 2, count: 5 },
+  { letter: "R", points: 2, count: 5 },
+  { letter: "S", points: 2, count: 5 },
+  { letter: "T", points: 2, count: 5 },
+  { letter: "G", points: 3, count: 3 },
+  { letter: "K", points: 3, count: 3 },
+  { letter: "L", points: 3, count: 3 },
+  { letter: "M", points: 3, count: 3 },
+  { letter: "B", points: 3, count: 2 },
+  { letter: "P", points: 3, count: 2 },
+  { letter: "U", points: 4, count: 3 },
+  { letter: "F", points: 4, count: 2 },
+  { letter: "H", points: 4, count: 2 },
+  { letter: "J", points: 4, count: 2 },
+  { letter: "V", points: 4, count: 2 },
+  { letter: "Z", points: 4, count: 2 },
+  { letter: "C", points: 5, count: 2 },
+  { letter: "W", points: 5, count: 2 },
+  { letter: "X", points: 8, count: 1 },
+  { letter: "Y", points: 8, count: 1 },
+  { letter: "Q", points: 10, count: 1 },
+];
+
+module.exports = { letters_hu_HU, letters_en_GB, letters_nl_NL };

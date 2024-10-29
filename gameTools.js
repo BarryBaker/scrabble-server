@@ -1,21 +1,23 @@
 const origi_board = require("./initialBoard");
 let letters = require("./letters");
 
-const originalAllLetters = [];
-let letterIdCounter = 1;
-letters.forEach((letter) => {
-  for (let i = 0; i < letter.count; i++) {
-    originalAllLetters.push({
-      id: letterIdCounter++,
-      letter: letter.letter,
-      points: letter.points,
-      place: "bag",
-      confirmed: false,
-      isWild: letter.letter === "",
-    });
-  }
-});
-
+const originalAllLetters = {};
+for (let lang of Object.keys(letters)) {
+  originalAllLetters[lang] = [];
+  let letterIdCounter = 1;
+  letters[lang].forEach((letter) => {
+    for (let i = 0; i < letter.count; i++) {
+      originalAllLetters[lang].push({
+        id: letterIdCounter++,
+        letter: letter.letter,
+        points: letter.points,
+        place: "bag",
+        confirmed: false,
+        isWild: letter.letter === "",
+      });
+    }
+  });
+}
 function buildBoard(allLetters) {
   const board = origi_board.map((row) =>
     row.map((cell) => ({
@@ -37,7 +39,7 @@ function buildBoard(allLetters) {
       id: letterObj.id,
       letter: letterObj.letter,
       points: letterObj.isWild
-        ? letters.filter((l) => l.letter === letterObj.letter)[0].points
+        ? allLetters.filter((l) => l.letter === letterObj.letter)[0].points
         : letterObj.points,
       confirmed: letterObj.confirmed,
     };

@@ -19,11 +19,7 @@ const {
 } = require("./utils");
 const { calculateScore } = require("./calcScore");
 const { checkWordWithHunspell } = require("./hunspell");
-const {
-  originalAllLetters,
-  buildBoard,
-  someUnconfirmed,
-} = require("./gameTools");
+const { buildBoard, someUnconfirmed } = require("./gameTools");
 
 const rooms = [];
 app.get("/rooms", (req, res) => {
@@ -31,10 +27,10 @@ app.get("/rooms", (req, res) => {
 });
 
 // Function to check words using hunspell
-async function validateWords(words) {
+async function validateWords(words, lang) {
   const validWords = [];
   for (const word of words) {
-    const isValid = await checkWordWithHunspell(word.toLowerCase());
+    const isValid = await checkWordWithHunspell(word.toLowerCase(), lang);
     if (isValid) {
       validWords.push(word);
     }
@@ -54,12 +50,15 @@ wss.on("connection", (ws) => {
 
     switch (data.type) {
       case "create-game":
+        console.log(data);
         const roomId =
           rooms.reduce((max, room) => {
             return room.roomId > max ? room.roomId : max;
           }, 0) + 1;
 
-        rooms.push(new Game(roomId, name || `Room ${roomId}`, data.playerCnt));
+        rooms.push(
+          new Game(roomId, name || `Room ${roomId}`, data.playerCnt, data.lang)
+        );
         ws.send(JSON.stringify({ type: "game-created" }));
         break;
 
@@ -277,7 +276,7 @@ wss.on("connection", (ws) => {
           word.map((letter) => letter.letter).join("")
         );
 
-        validateWords(allWords)
+        validateWords(allWords, room.language)
           .then((validWords) => {
             console.log(allWords, validWords);
             // const invalidWords = allWords.filter(
@@ -434,6 +433,6 @@ server.listen(3000, () => {
   console.log("Server is listening on port 3000");
 });
 
-checkWordWithHunspell("ádl'").then((e) => {
-  console.log(e);
-});
+// checkWordWithHunspell("fucker", "en_GB").then((e) => {
+//   console.log(e);
+// });

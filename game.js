@@ -4,12 +4,15 @@ const { buildBoard, originalAllLetters } = require("./gameTools");
 const { shuffle, remainingLetters, hasIsolatedLetters } = require("./utils");
 
 class Game {
-  constructor(roomId, roomName, requiredPlayers = 2) {
+  constructor(roomId, roomName, requiredPlayers = 2, language = "hu_HU") {
     this.roomId = roomId;
+    this.language = language;
     this.roomName = roomName;
     this.requiredPlayers = requiredPlayers;
     this.players = [];
-    this.allLetters = JSON.parse(JSON.stringify(originalAllLetters));
+    this.allLetters = JSON.parse(
+      JSON.stringify(originalAllLetters[`letters_${language}`])
+    );
     this.playerInTurn = null;
     this.lastPacked = [];
     shuffle(this.allLetters);
