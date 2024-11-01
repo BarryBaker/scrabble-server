@@ -79,10 +79,6 @@ class Game {
       type: "update-board",
       board: buildBoard(this.allLetters),
     });
-    // return {
-    //   firstPlayer: this.players[firstToAct].name,
-    //   board: buildBoard(this.allLetters),
-    // };
   }
   endGame(winner) {
     this.allLetters.forEach((letter) => {
@@ -149,12 +145,6 @@ class Game {
     });
     this.sendLetters();
   }
-
-  //   validateWords(words) {
-  //     return Promise.all(
-  //       words.map((word) => checkWordWithHunspell(word.toLowerCase()))
-  //     ).then((results) => results.every((isValid) => isValid));
-  //   }
 
   saveState() {
     const state = {

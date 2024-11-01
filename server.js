@@ -169,7 +169,6 @@ wss.on("connection", (ws) => {
             points: letterObj.points,
           };
         }
-        // const newboard = buildBoard(allLetters);
 
         const words = [];
 
@@ -403,7 +402,6 @@ wss.on("connection", (ws) => {
         if (someUnconfirmed(room.allLetters)) {
           break;
         }
-        // const theplayer = players.find((p) => p.name === data.player);
         player.surrendered = true;
         if (room.players.every((p) => p.surrendered)) {
           room.endGame();
@@ -417,15 +415,6 @@ wss.on("connection", (ws) => {
         });
         room.playerInTurn = getNextPlayer(data.player, room.players);
         break;
-      // case "new":
-      //   requiredPlayers = data.playerCnt;
-      //   players = [];
-      //   playerInTurn = null;
-      //   lastPacked = [];
-      //   allLetters = JSON.parse(JSON.stringify(originalAllLetters));
-
-      //   shuffle(allLetters);
-      //   break;
     }
   });
 });
