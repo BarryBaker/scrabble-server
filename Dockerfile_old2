@@ -10,21 +10,11 @@ RUN apt-get update && apt-get install -y \
     wget \
     curl \
     locales \
-    pkg-config \
-    gettext \
-    autopoint \  
-    && apt-get clean
+    hunspell && \
+    apt-get clean
 
-# Install Hunspell 1.7.2 from source
-RUN wget https://github.com/hunspell/hunspell/archive/v1.7.2.tar.gz \
-    && tar -xzf v1.7.2.tar.gz \
-    && cd hunspell-1.7.2 \
-    && autoreconf -vfi \
-    && ./configure && make && make install \
-    && ldconfig \
-    && cd .. && rm -rf hunspell-1.7.2 v1.7.2.tar.gz
 
-# Set default locale to Hungarian (can be changed if necessary)
+    # Set default locale to Hungarian (can be changed if necessary)
 ENV LANG=hu_HU.UTF-8
 ENV LANGUAGE=hu_HU:hu
 ENV LC_ALL=hu_HU.UTF-8
@@ -46,5 +36,5 @@ RUN npm install
 # Expose port (if needed)
 EXPOSE 3000
 
-# Start the application
+# Start the application (adjust as needed)
 CMD ["npm", "start"]
