@@ -7,10 +7,10 @@ function checkWordWithHunspell(word, language = "hu_HU") {
       `echo "${word}" | hunspell -i UTF-8 -d ${language}`, // Notice the -d hu_HU (no full path needed)
       (error, stdout, stderr) => {
         if (error) {
-          // console.log(word, stdout, "error");
+          console.log(word, stdout, "error");
           reject(error);
         } else {
-          // console.log(word, stdout, "joo");
+          console.log(word, stdout);
           const isCorrect = stdout.includes("*") || stdout.includes("+");
           resolve(isCorrect);
         }
