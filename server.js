@@ -29,12 +29,13 @@ app.get("/rooms", (req, res) => {
 // Function to check words using hunspell
 async function validateWords(words, lang) {
   const validWords = [];
-  for (const word of words) {
+  for (const word of words.slice(0, 1000)) {
     const isValid = await checkWordWithHunspell(word.toLowerCase(), lang);
     if (isValid) {
       validWords.push(word);
     }
   }
+
   return validWords;
 }
 
@@ -422,6 +423,6 @@ server.listen(3000, () => {
   console.log("Server is listening on port 3000");
 });
 
-checkWordWithHunspell("tágárjil", "hu_HU").then((e) => {
-  console.log(e);
-});
+// checkWordWithHunspell("ram", "en_GB").then((e) => {
+//   console.log(e);
+// });
