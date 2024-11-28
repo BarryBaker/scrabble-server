@@ -67,9 +67,9 @@ def check_other_word_validity(board, letter, is_column, invalid):
     # Get the word formed
     word_formed = "".join(row[start : end + 1])
 
-    if len(word_formed) > 1:
+    # if len(word_formed) > 1:
 
-        qw("     ", word_formed, invalid)
+    #     qw("     ", word_formed, invalid)
     # qw("     ", inlist(word_formed, invalid))
     #     qw(
     #         len(word_formed) == 1
