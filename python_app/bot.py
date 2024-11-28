@@ -149,6 +149,7 @@ def words_for_lettergroup(
     line_number,
     invalid,
 ):  # word is lettergroup (1 or more length)
+
     result = []
 
     def extend_word(filtered_words, word, letters, before, after):
@@ -224,6 +225,7 @@ def words_for_lettergroup(
                     # ):
                     if stillgood:
                         result.append(new_word_details)
+
                     # else:
                     #     print("nemjo", new_word_details)
                 # st = time.time()
@@ -232,8 +234,9 @@ def words_for_lettergroup(
                     for i in filtered_words
                     if new_word in i and len(i) > len(new_word)
                 ]
-                # qw(time.time() - st)
+
                 # qw("aaaaa")
+
                 # time.sleep(0.002)
 
                 if len(possible_words) > 0:
@@ -261,6 +264,7 @@ def words_for_lettergroup(
     # result = [(i[0], i[2]) for i in result]
     # for i in result:
     #     print(i)
+    # print(tt)
     return result
 
 
