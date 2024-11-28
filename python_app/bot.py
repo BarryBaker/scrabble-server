@@ -226,12 +226,15 @@ def words_for_lettergroup(
                         result.append(new_word_details)
                     # else:
                     #     print("nemjo", new_word_details)
-
+                # st = time.time()
                 possible_words = [
                     i
                     for i in filtered_words
                     if new_word in i and len(i) > len(new_word)
                 ]
+                # qw(time.time() - st)
+                # qw("aaaaa")
+                # time.sleep(0.002)
 
                 if len(possible_words) > 0:
                     if orient == 0:
@@ -316,20 +319,62 @@ if __name__ == "__main__":
 
     st = time.time()
 
-    board_str = sys.argv[1]  # Board is passed as a JSON string
-    letters_str = sys.argv[2]  # Rack is passed as a JSON string
-    invalid_str = sys.argv[3]
-    # Deserialize JSON to Python objects
-    board = json.loads(board_str)
-    letters = json.loads(letters_str)
-    invalid = json.loads(invalid_str)
+    # board_str = sys.argv[1]  # Board is passed as a JSON string
+    # letters_str = sys.argv[2]  # Rack is passed as a JSON string
+    # invalid_str = sys.argv[3]
+    # # Deserialize JSON to Python objects
+    # board = json.loads(board_str)
+    # letters = json.loads(letters_str)
+    # invalid = json.loads(invalid_str)
+    board = [
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+        [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "B",
+            "A",
+            "B",
+            "O",
+            "S",
+            "E",
+            "",
+            "",
+        ],
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+    ]
 
-    # print(invalid, file=sys.stderr)
-    # qw("before", time.time())
+    letters = ["Q", "A", "E", "U", "S", "S", "T", "B"]
+    invalid = []
+    st = time.time()
+    fwords = [word for word in words if set(word).issubset(set(letters))]
+
+    print(time.time() - st)
+    # print(fwords)
+
+    st = time.time()
+    fwords = [word for word in words if "in" in word]
+
     result = main(board, letters, invalid)
     # Convert result to a JSON string
     result_json = json.dumps(result)
     qw("after", time.time() - st)
 
     # Return the JSON string
-    print(result_json)  # This will be captured as stdout by Node.js
+    # print(result_json)  # This will be captured as stdout by Node.js
