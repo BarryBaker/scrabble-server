@@ -15,6 +15,7 @@ class Game {
     );
     this.playerInTurn = null;
     this.lastPacked = [];
+    this.invalid = [];
     shuffle(this.allLetters);
   }
 
@@ -33,27 +34,7 @@ class Game {
       .filter((letter) => letter.place === "bag")
       .slice(0, lettersToFill);
     newLetters.forEach((letter) => (letter.place = `player-${player.name}`));
-    player.ws.send(
-      JSON.stringify({
-        type: "update-letters",
-        letters: this.allLetters.filter(
-          (letter) => letter.place === `player-${player.name}`
-        ),
-      })
-    );
-    this.broadcast({
-      type: "remaining-letters",
-      remainingLetters: remainingLetters(this.allLetters).length,
-    });
-  }
-
-  broadcast(data) {
-    this.players.forEach((player) => {
-      player.ws.send(JSON.stringify(data));
-    });
-  }
-  sendLetters() {
-    this.players.forEach((player) => {
+    if (player.ws) {
       player.ws.send(
         JSON.stringify({
           type: "update-letters",
@@ -62,6 +43,32 @@ class Game {
           ),
         })
       );
+    }
+    this.broadcast({
+      type: "remaining-letters",
+      remainingLetters: remainingLetters(this.allLetters).length,
+    });
+  }
+
+  broadcast(data) {
+    this.players.forEach((player) => {
+      if (player.ws) {
+        player.ws.send(JSON.stringify(data));
+      }
+    });
+  }
+  sendLetters() {
+    this.players.forEach((player) => {
+      if (player.ws) {
+        player.ws.send(
+          JSON.stringify({
+            type: "update-letters",
+            letters: this.allLetters.filter(
+              (letter) => letter.place === `player-${player.name}`
+            ),
+          })
+        );
+      }
     });
   }
   startGame() {

@@ -1,5 +1,6 @@
 const WebSocket = require("ws");
 const Game = require("./game");
+// import { exec } from 'child_process';
 
 const cors = require("cors");
 const express = require("express");
@@ -11,15 +12,21 @@ const server = http.createServer(app); // Create HTTP server
 const wss = new WebSocket.Server({ server }); // Attach WebSocket to HTTP server
 
 const {
-  hasIsolatedLetters,
   getNextPlayer,
   shuffle,
   remainingLetters,
   removeRoomById,
 } = require("./utils");
-const { calculateScore } = require("./calcScore");
-const { checkWordWithHunspell } = require("./hunspell");
+
 const { buildBoard, someUnconfirmed } = require("./gameTools");
+const { turn } = require("./websocket/turn");
+const { surrender } = require("./websocket/surrender");
+
+const { changeLetters } = require("./websocket/changeLetters");
+
+const { bot_put_letters } = require("./bot");
+
+// Call the Python script
 
 const rooms = [];
 app.get("/rooms", (req, res) => {
@@ -27,21 +34,11 @@ app.get("/rooms", (req, res) => {
 });
 
 // Function to check words using hunspell
-async function validateWords(words, lang) {
-  const validWords = [];
-  for (const word of words.slice(0, 1000)) {
-    const isValid = await checkWordWithHunspell(word.toLowerCase(), lang);
-    if (isValid) {
-      validWords.push(word);
-    }
-  }
-
-  return validWords;
-}
 
 wss.on("connection", (ws) => {
   ws.on("message", (message) => {
     const data = JSON.parse(message);
+    // console.log(data);
     const room = rooms.find((r) => r.roomId === Number(data.roomId));
 
     const player = room
@@ -49,14 +46,57 @@ wss.on("connection", (ws) => {
       : null;
     const name = data.name;
 
-    switch (data.type) {
-      case "create-game":
-        console.log(data);
-        const roomId =
-          rooms.reduce((max, room) => {
-            return room.roomId > max ? room.roomId : max;
-          }, 0) + 1;
+    const roomId =
+      rooms.reduce((max, room) => {
+        return room.roomId > max ? room.roomId : max;
+      }, 0) + 1;
 
+    switch (data.type) {
+      case "create-solo-game":
+        if (name === "bot") {
+          break;
+        }
+        new_solo_room = new Game(roomId, name || `Room ${roomId}`, 2, "en_GB");
+        rooms.push(new_solo_room);
+
+        const solo_player = {
+          name: name || `Player`,
+          ws,
+          score: 0,
+          surrendered: false,
+        };
+
+        new_solo_room.players.push(solo_player);
+        new_solo_room.players.push({
+          name: "bot",
+          ws: null,
+          score: 0,
+          surrendered: false,
+        });
+        solo_player.ws.send(
+          JSON.stringify({
+            type: "new-player",
+            name: solo_player.name,
+            roomId: new_solo_room.roomId,
+          })
+        );
+
+        new_solo_room.broadcast({
+          type: "players",
+          players: new_solo_room.players.map((p) => p.name),
+        });
+        new_solo_room.startGame();
+
+        ws.send(JSON.stringify({ type: "game-created" }));
+
+        if (new_solo_room.playerInTurn === "bot") {
+          const bp = new_solo_room.players.find((p) => p.name === "bot");
+
+          bot_put_letters(new_solo_room);
+        }
+        break;
+
+      case "create-game":
         rooms.push(
           new Game(roomId, name || `Room ${roomId}`, data.playerCnt, data.lang)
         );
@@ -64,6 +104,9 @@ wss.on("connection", (ws) => {
         break;
 
       case "join":
+        if (name === "bot") {
+          break;
+        }
         const newPlayer = {
           name: name || `Player ${room.players.length + 1}`,
           ws,
@@ -109,7 +152,7 @@ wss.on("connection", (ws) => {
             type: "update-board",
             board: buildBoard(room.allLetters),
           });
-          // fillLetters(player);
+
           room.sendLetters();
           room.broadcast({
             type: "turn",
@@ -153,183 +196,7 @@ wss.on("connection", (ws) => {
         break;
 
       case "turn":
-        const boardSize = 15; // Assuming a 15x15 Scrabble board
-        const newboard = Array.from({ length: boardSize }, () =>
-          Array(boardSize).fill(null)
-        );
-
-        // Place the letters on the board
-        const boardLetters = room.allLetters.filter((letter) =>
-          letter.place.startsWith("board")
-        );
-        for (let letterObj of boardLetters) {
-          const [_, row, col] = letterObj.place.split("-");
-          newboard[parseInt(row)][parseInt(col)] = {
-            letter: letterObj.letter,
-            confirmed: letterObj.confirmed,
-            points: letterObj.points,
-          };
-        }
-
-        const words = [];
-
-        function collectWordsInDirection(isHorizontal) {
-          for (let i = 0; i < boardSize; i++) {
-            let word = [];
-            for (let j = 0; j < boardSize; j++) {
-              const letterObj = isHorizontal ? newboard[i][j] : newboard[j][i];
-              if (letterObj) {
-                word.push({
-                  ...letterObj,
-                  row: isHorizontal ? i : j,
-                  col: isHorizontal ? j : i,
-                });
-              } else if (word.length > 1) {
-                words.push(word);
-                word = [];
-              } else {
-                word = [];
-              }
-            }
-            if (word.length > 1) {
-              words.push(word);
-            }
-          }
-        }
-        collectWordsInDirection(true);
-        collectWordsInDirection(false);
-
-        const classifiedWords = {
-          onlyConfirmed: [],
-          mixed: [],
-          onlyUnconfirmed: [],
-        };
-
-        for (let word of words) {
-          const hasConfirmed = word.some((letter) => letter.confirmed);
-          const hasUnconfirmed = word.some((letter) => !letter.confirmed);
-
-          if (hasConfirmed && hasUnconfirmed) {
-            classifiedWords.mixed.push(word);
-          } else if (hasConfirmed) {
-            classifiedWords.onlyConfirmed.push(word);
-          } else {
-            classifiedWords.onlyUnconfirmed.push(word);
-          }
-        }
-
-        function continueGame() {
-          room.allLetters.forEach((letter) => {
-            if (letter.place.startsWith("board")) {
-              letter.confirmed = true;
-            }
-          });
-
-          room.broadcast({
-            type: "update-board",
-            board: buildBoard(room.allLetters),
-          });
-          room.broadcast({
-            type: "turn",
-            player: getNextPlayer(data.player, room.players),
-          });
-          room.playerInTurn = getNextPlayer(data.player, room.players);
-          room.fillLetters(player);
-        }
-
-        if (
-          (classifiedWords.onlyConfirmed.length > 0 ||
-            classifiedWords.mixed.length > 0) &&
-          classifiedWords.onlyUnconfirmed.length > 0
-        ) {
-          room.packBackLetters(data.player);
-          break;
-        }
-        if (hasIsolatedLetters(room.allLetters)) {
-          room.packBackLetters(data.player);
-          break;
-        }
-
-        let goodWords = [];
-        if (words.length === 1 && classifiedWords.onlyUnconfirmed.length > 0) {
-          const containsMiddleCell = words[0].some(
-            (letter) => letter.row === 7 && letter.col === 7
-          );
-          const isHorizontal = words[0].every((letter) => letter.row === 7);
-          const startsAtMiddleAndGoesRight =
-            words[0][0].row === 7 && words[0][0].col === 7;
-          if (
-            containsMiddleCell &&
-            isHorizontal &&
-            startsAtMiddleAndGoesRight
-          ) {
-            goodWords.push(words[0]);
-          } else {
-            packBackLetters(data.player);
-            break;
-          }
-        } else {
-          goodWords = [...classifiedWords.mixed];
-        }
-
-        const allWords = goodWords.map((word) =>
-          word.map((letter) => letter.letter).join("")
-        );
-
-        validateWords(allWords, room.language)
-          .then((validWords) => {
-            console.log(allWords, validWords);
-            // const invalidWords = allWords.filter(
-            //   (word) => !validWords.includes(word)
-            // );
-
-            if (validWords.length === allWords.length) {
-              const score = calculateScore(goodWords);
-              player.score += score;
-              const unConfirmeLetters = room.allLetters.filter(
-                (letter) =>
-                  letter.place.startsWith("board") && !letter.confirmed
-              );
-              if (unConfirmeLetters.length === 7) {
-                player.score += 50;
-              }
-
-              room.lastPacked = [...unConfirmeLetters];
-              room.broadcast({
-                type: "lastpacked",
-                lastPacked: room.lastPacked,
-              });
-
-              room.broadcast({
-                type: "update-score",
-                scores: room.players.reduce((acc, player) => {
-                  acc[player.name] = player.score;
-                  return acc;
-                }, {}),
-              });
-
-              //Check if game ends
-              if (
-                room.allLetters.filter(
-                  (letter) => letter.place === `player-${data.player}`
-                ).length === 0 &&
-                room.allLetters.filter((letter) => letter.place === "bag")
-                  .length === 0
-              ) {
-                room.endGame(data.player);
-                removeRoomById(rooms, room.roomId);
-              } else {
-                continueGame();
-              }
-            } else {
-              // console.log("Invalid words found: ", invalidWords);
-
-              room.packBackLetters(data.player);
-            }
-          })
-          .catch((error) => {
-            console.error("Error during word validation: ", error);
-          });
+        turn(room, player);
         break;
 
       case "update-board-cell":
@@ -365,24 +232,12 @@ wss.on("connection", (ws) => {
 
         break;
       case "change-all-letters":
-        if (someUnconfirmed(room.allLetters)) {
-          break;
+        changeLetters(room, player);
+
+        if (room.playerInTurn === "bot") {
+          bot_put_letters(room);
         }
 
-        room.allLetters.forEach((letter) => {
-          if (letter.place === `player-${player.name}`) {
-            letter.place = "bag";
-          }
-        });
-
-        shuffle(room.allLetters);
-        room.fillLetters(player);
-        room.broadcast({
-          type: "turn",
-          player: getNextPlayer(data.player, room.players),
-        });
-        room.playerInTurn = getNextPlayer(data.player, room.players);
-        break;
       case "shuffle":
         if (someUnconfirmed(room.allLetters)) {
           break;
@@ -400,22 +255,10 @@ wss.on("connection", (ws) => {
         );
         break;
       case "surrender":
-        if (someUnconfirmed(room.allLetters)) {
-          break;
+        surrender(room, player);
+        if (room.playerInTurn === "bot") {
+          bot_put_letters(room);
         }
-        player.surrendered = true;
-        if (room.players.every((p) => p.surrendered)) {
-          room.endGame();
-          removeRoomById(rooms, room.roomId);
-          break;
-        }
-
-        room.broadcast({
-          type: "turn",
-          player: getNextPlayer(data.player, room.players),
-        });
-        room.playerInTurn = getNextPlayer(data.player, room.players);
-        break;
     }
   });
 });

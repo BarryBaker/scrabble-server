@@ -41,7 +41,7 @@ const letters_hu_HU = [
 ];
 
 const letters_en_GB = [
-  { letter: "", points: null, count: 2 }, // Blank tiles
+  // { letter: "", points: null, count: 2 }, // Blank tiles
   { letter: "E", points: 1, count: 12 },
   { letter: "A", points: 1, count: 9 },
   { letter: "I", points: 1, count: 9 },

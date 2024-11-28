@@ -3,6 +3,7 @@ FROM node:14-slim
 
 # Install dependencies and necessary tools
 RUN apt-get update && apt-get install -y \
+  
     build-essential \
     autoconf \
     automake \
@@ -13,6 +14,9 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     gettext \
     autopoint \  
+    python3 \
+    python3-pip \
+    python3-venv \
     && apt-get clean
 
 # Install Hunspell 1.7.2 from source
@@ -39,6 +43,13 @@ ENV DICPATH=/usr/local/share/hunspell
 # Set the working directory and copy your app code
 WORKDIR /usr/src/app
 COPY . .
+
+
+# Create Python virtual environment and install dependencies
+RUN python3 -m venv python_app/venv && \
+    python_app/venv/bin/pip install --upgrade pip && \
+    python_app/venv/bin/pip install numpy
+
 
 # Install Node.js dependencies
 RUN npm install
