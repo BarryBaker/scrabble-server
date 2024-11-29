@@ -16,6 +16,10 @@ def qw(*a):
     print(a, file=sys.stderr)
 
 
+def t():
+    return time.time()
+
+
 cwd = os.getcwd()
 
 with open(f"{cwd}/wordlist.txt", "r") as file:
@@ -317,59 +321,61 @@ def main(board, letters, invalid):
 
 if __name__ == "__main__":
 
-    st = time.time()
+    st = t()
+    aa = inlist("QUEER", words)
+    print((t() - st) * 1000)
 
-    # board_str = sys.argv[1]  # Board is passed as a JSON string
-    # letters_str = sys.argv[2]  # Rack is passed as a JSON string
-    # invalid_str = sys.argv[3]
-    # # Deserialize JSON to Python objects
-    # board = json.loads(board_str)
-    # letters = json.loads(letters_str)
-    # invalid = json.loads(invalid_str)
-    board = [
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-        [
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "B",
-            "A",
-            "B",
-            "O",
-            "S",
-            "E",
-            "",
-            "",
-        ],
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-    ]
+    st = t()
+    bb = "QUEER" in words
+    print((t() - st) * 1000)
 
-    letters = ["Q", "A", "E", "U", "S", "S", "T", "B"]
-    invalid = []
-    st = time.time()
-    fwords = [word for word in words if set(word).issubset(set(letters))]
+    st = t()
+    cc = [i for i in words if "QUEER" in i]
+    print((t() - st) * 1000)
+    print(len(cc))
+    board_str = sys.argv[1]  # Board is passed as a JSON string
+    letters_str = sys.argv[2]  # Rack is passed as a JSON string
+    invalid_str = sys.argv[3]
+    # Deserialize JSON to Python objects
+    board = json.loads(board_str)
+    letters = json.loads(letters_str)
+    invalid = json.loads(invalid_str)
+    # board = [
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [
+    #         "",
+    #         "",
+    #         "",
+    #         "",
+    #         "",
+    #         "",
+    #         "",
+    #         "B",
+    #         "A",
+    #         "B",
+    #         "O",
+    #         "S",
+    #         "E",
+    #         "",
+    #         "",
+    #     ],
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    # ]
 
-    print(time.time() - st)
-    # print(fwords)
-
-    st = time.time()
-    fwords = [word for word in words if "in" in word]
+    # letters = ["Q", "A", "E", "U", "S", "S", "T", "B"]
+    # invalid = []
 
     result = main(board, letters, invalid)
     # Convert result to a JSON string
@@ -377,4 +383,4 @@ if __name__ == "__main__":
     qw("after", time.time() - st)
 
     # Return the JSON string
-    # print(result_json)  # This will be captured as stdout by Node.js
+    print(result_json)  # This will be captured as stdout by Node.js
