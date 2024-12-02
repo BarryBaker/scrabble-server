@@ -10,6 +10,7 @@ import time
 import copy
 from itertools import permutations
 import time
+import re
 
 
 def qw(*a):
@@ -31,7 +32,7 @@ with open(f"{cwd}/wordlist.txt", "r") as file:
 def inlist(word, words):
     index = bisect.bisect_left(words, word)  # Find the insertion point
     # Check if the word exists at the found index
-    return index < len(words) and words[index] == word
+    return index < len(words) and words[index] == word, index
 
 
 def check_other_word_validity(board, letter, is_column, invalid):
@@ -167,12 +168,14 @@ def words_for_lettergroup(
                 else:
                     continue
 
-                # if new_word in filtered_words:
-                # elapsed_time_task_1 = time.time() - start_time
-                # print(f"Task 1 took {elapsed_time_task_1:.4f} seconds") time.time()
-                # if len(invalid) > 0:
-                #     qw(invalid, new_word, inlist(new_word, invalid))
-                if inlist(new_word, filtered_words) and not new_word in invalid:
+                possible_words = [
+                    i
+                    for i in filtered_words
+                    if new_word in i  # and len(i) > len(new_word)
+                ]
+                new_word_in_list, ind = inlist(new_word, possible_words)
+
+                if new_word_in_list and not new_word in invalid:
 
                     put_before = before_max - before + (orient == 0)
                     put_after = len(new_word) - len(origi_word) - put_before
@@ -209,36 +212,28 @@ def words_for_lettergroup(
                             ]
                         ),
                     )
-                    # qw(new_word)
-                    stillgood = True
-                    for check_letter in new_word_details[2]:
 
-                        # qw(check_letter)
-                        if not check_other_word_validity(
-                            board, check_letter, is_column, invalid
-                        ):
-                            stillgood = False
-                            break
+                    # stillgood = True
+                    # for check_letter in new_word_details[2]:
 
-                    # if all(
-                    #     check_other_word_validity(
+                    #     # qw(check_letter)
+                    #     if not check_other_word_validity(
                     #         board, check_letter, is_column, invalid
-                    #     )
-                    #     for check_letter in new_word_details[2]
-                    # ):
-                    if stillgood:
+                    #     ):
+                    #         stillgood = False
+                    #         break
+
+                    if all(
+                        check_other_word_validity(
+                            board, check_letter, is_column, invalid
+                        )
+                        for check_letter in new_word_details[2]
+                    ):
+                        # if stillgood:
                         result.append(new_word_details)
-                    # else:
-                    #     print("nemjo", new_word_details)
-                # st = time.time()
-                possible_words = [
-                    i
-                    for i in filtered_words
-                    if new_word in i and len(i) > len(new_word)
-                ]
-                # qw(time.time() - st)
-                # qw("aaaaa")
-                # time.sleep(0.002)
+
+                if new_word_in_list:
+                    del possible_words[ind]
 
                 if len(possible_words) > 0:
                     if orient == 0:
@@ -260,11 +255,6 @@ def words_for_lettergroup(
                         )
 
     extend_word(words, origi_word, letters, before_max, after_max)
-    # result = list(set(result))
-    # result = sorted(result, key=lambda x: (x[0], x[1]))
-    # result = [(i[0], i[2]) for i in result]
-    # for i in result:
-    #     print(i)
     return result
 
 
@@ -322,65 +312,73 @@ def main(board, letters, invalid):
 if __name__ == "__main__":
 
     st = t()
-    aa = inlist("QUEER", words)
-    print((t() - st) * 1000)
+    # aa = inlist("QUEER", words)
+    # # del words[aa[1]]
+    # print((t() - st) * 1000)
 
-    st = t()
-    bb = "QUEER" in words
-    print((t() - st) * 1000)
+    # st = t()
+    # bb = "QUEER" in words
+    # print((t() - st) * 1000)
 
-    st = t()
-    cc = [i for i in words if "QUEER" in i]
-    print((t() - st) * 1000)
-    print(len(cc))
-    board_str = sys.argv[1]  # Board is passed as a JSON string
-    letters_str = sys.argv[2]  # Rack is passed as a JSON string
-    invalid_str = sys.argv[3]
-    # Deserialize JSON to Python objects
-    board = json.loads(board_str)
-    letters = json.loads(letters_str)
-    invalid = json.loads(invalid_str)
-    # board = [
-    #     [""] * 15,
-    #     [""] * 15,
-    #     [""] * 15,
-    #     [""] * 15,
-    #     [""] * 15,
-    #     [""] * 15,
-    #     [""] * 15,
-    #     [
-    #         "",
-    #         "",
-    #         "",
-    #         "",
-    #         "",
-    #         "",
-    #         "",
-    #         "B",
-    #         "A",
-    #         "B",
-    #         "O",
-    #         "S",
-    #         "E",
-    #         "",
-    #         "",
-    #     ],
-    #     [""] * 15,
-    #     [""] * 15,
-    #     [""] * 15,
-    #     [""] * 15,
-    #     [""] * 15,
-    #     [""] * 15,
-    #     [""] * 15,
-    # ]
+    # st = t()
+    # cc = [i for i in words if "R" in i]
+    # print((t() - st) * 1000)
+    # print(len(words), len(cc))
 
-    # letters = ["Q", "A", "E", "U", "S", "S", "T", "B"]
-    # invalid = []
+    # st = t()
+    # index = bisect.bisect_left(words, "QUEER")
+    # dd = index < len(words) and words[index] == "QUEER"
+    # print((t() - st) * 1000)
+    # print(index, dd, words[index])
+
+    # board_str = sys.argv[1]  # Board is passed as a JSON string
+    # letters_str = sys.argv[2]  # Rack is passed as a JSON string
+    # invalid_str = sys.argv[3]
+    # # Deserialize JSON to Python objects
+    # board = json.loads(board_str)
+    # letters = json.loads(letters_str)
+    # invalid = json.loads(invalid_str)
+    board = [
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+        [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "B",
+            "A",
+            "B",
+            "O",
+            "S",
+            "E",
+            "",
+            "",
+        ],
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+        [""] * 15,
+    ]
+
+    letters = ["Q", "A", "E", "U", "S", "S", ""]
+    invalid = []
 
     result = main(board, letters, invalid)
     # Convert result to a JSON string
     result_json = json.dumps(result)
-    qw("after", time.time() - st)
+    qw("after", t() - st)
 
     # Return the JSON string
     print(result_json)  # This will be captured as stdout by Node.js

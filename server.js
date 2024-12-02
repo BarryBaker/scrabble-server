@@ -25,7 +25,7 @@ const { surrender } = require("./websocket/surrender");
 const { changeLetters } = require("./websocket/changeLetters");
 
 const { bot_put_letters } = require("./bot");
-
+const { checkWordWithHunspell } = require("./hunspell");
 // Call the Python script
 
 const rooms = [];
@@ -266,6 +266,6 @@ server.listen(3000, () => {
   console.log("Server is listening on port 3000");
 });
 
-// checkWordWithHunspell("ram", "en_GB").then((e) => {
-//   console.log(e);
-// });
+checkWordWithHunspell("ng", "en_GB").then((e) => {
+  console.log(e);
+});

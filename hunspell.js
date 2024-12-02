@@ -32,4 +32,5 @@ async function validateWords(words, lang) {
 
 module.exports = {
   validateWords,
+  checkWordWithHunspell,
 };
