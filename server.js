@@ -221,7 +221,7 @@ wss.on("connection", (ws) => {
 
           theLetter.letter = desiredLetter;
 
-          theLetter["isWid"] = true;
+          // theLetter["isWid"] = true;
         }
         room.sendLetters();
 
@@ -266,6 +266,6 @@ server.listen(3000, () => {
   console.log("Server is listening on port 3000");
 });
 
-checkWordWithHunspell("ng", "en_GB").then((e) => {
-  console.log(e);
-});
+// checkWordWithHunspell("ng", "en_GB").then((e) => {
+//   console.log(e);
+// });

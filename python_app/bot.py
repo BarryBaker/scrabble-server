@@ -10,7 +10,7 @@ import time
 import copy
 from itertools import permutations
 import time
-import re
+import string  # To get all uppercase letters (A-Z)
 
 
 def qw(*a):
@@ -156,103 +156,127 @@ def words_for_lettergroup(
 ):  # word is lettergroup (1 or more length)
     result = []
 
-    def extend_word(filtered_words, word, letters, before, after):
+    def extend_word(filtered_words, word, letters, before, after, wild_letter=None):
         # print(word, letters, before, after, file=sys.stderr)
-        # time.sleep(0.05)
+        word_found = False
+
         for l in letters:
-            for orient in range(2):
-                if orient == 0 and before > 0:
-                    new_word = l + word
-                elif orient == 1 and after > 0:
-                    new_word = word + l
-                else:
-                    continue
 
-                possible_words = [
-                    i
-                    for i in filtered_words
-                    if new_word in i  # and len(i) > len(new_word)
-                ]
-                new_word_in_list, ind = inlist(new_word, possible_words)
-
-                if new_word_in_list and not new_word in invalid:
-
-                    put_before = before_max - before + (orient == 0)
-                    put_after = len(new_word) - len(origi_word) - put_before
-                    start = index_of_origi_word - put_before
-                    end = index_of_origi_word + len(origi_word)
-
-                    new_word_details = (
-                        new_word,
-                        start,
-                        tuple(
-                            [
-                                (
-                                    (new_word[i], start + i, line_number)
-                                    if is_column
-                                    else (new_word[i], line_number, start + i)
-                                )
-                                for i in range(put_before)
-                            ]
-                            + [
-                                (
-                                    (
-                                        new_word[-(i + 1)],
-                                        end + put_after - i - 1,
-                                        line_number,
-                                    )
-                                    if is_column
-                                    else (
-                                        new_word[-(i + 1)],
-                                        line_number,
-                                        end + put_after - i - 1,
-                                    )
-                                )
-                                for i in reversed(range(put_after))
-                            ]
-                        ),
+            if l == "":
+                for wildcard_letter in string.ascii_uppercase:
+                    if wildcard_letter in letters:
+                        continue
+                    found = extend_word(
+                        filtered_words,
+                        word,
+                        [i for i in letters + [wildcard_letter] if i != ""],
+                        before,
+                        after,
+                        wildcard_letter,
                     )
+                    if found:
+                        break
+            else:
+                for orient in range(2):
 
-                    # stillgood = True
-                    # for check_letter in new_word_details[2]:
+                    if orient == 0 and before > 0:
+                        new_word = l + word
 
-                    #     # qw(check_letter)
-                    #     if not check_other_word_validity(
-                    #         board, check_letter, is_column, invalid
-                    #     ):
-                    #         stillgood = False
-                    #         break
+                    elif orient == 1 and after > 0:
+                        new_word = word + l
 
-                    if all(
-                        check_other_word_validity(
-                            board, check_letter, is_column, invalid
-                        )
-                        for check_letter in new_word_details[2]
-                    ):
-                        # if stillgood:
-                        result.append(new_word_details)
-
-                if new_word_in_list:
-                    del possible_words[ind]
-
-                if len(possible_words) > 0:
-                    if orient == 0:
-                        new_before = before - 1
-                        new_after = after
                     else:
-                        new_before = before
-                        new_after = after - 1
+                        continue
 
-                    if new_before + new_after > 0:
-                        new_letters = letters.copy()
-                        new_letters.remove(l)
-                        extend_word(
-                            possible_words,
+                    possible_words = [
+                        i
+                        for i in filtered_words
+                        if new_word in i  # and len(i) > len(new_word)
+                    ]
+                    new_word_in_list, ind = inlist(new_word, possible_words)
+
+                    if new_word_in_list and not new_word in invalid:
+
+                        put_before = before_max - before + (orient == 0)
+                        put_after = len(new_word) - len(origi_word) - put_before
+                        start = index_of_origi_word - put_before
+                        end = index_of_origi_word + len(origi_word)
+
+                        new_word_details = (
                             new_word,
-                            new_letters,
-                            new_before,
-                            new_after,
+                            start,
+                            tuple(
+                                [
+                                    (
+                                        (
+                                            new_word[i],
+                                            start + i,
+                                            line_number,
+                                            wild_letter == new_word[i],
+                                        )
+                                        if is_column
+                                        else (
+                                            new_word[i],
+                                            line_number,
+                                            start + i,
+                                            wild_letter == new_word[i],
+                                        )
+                                    )
+                                    for i in range(put_before)
+                                ]
+                                + [
+                                    (
+                                        (
+                                            new_word[-(i + 1)],
+                                            end + put_after - i - 1,
+                                            line_number,
+                                            wild_letter == new_word[-(i + 1)],
+                                        )
+                                        if is_column
+                                        else (
+                                            new_word[-(i + 1)],
+                                            line_number,
+                                            end + put_after - i - 1,
+                                            wild_letter == new_word[-(i + 1)],
+                                        )
+                                    )
+                                    for i in reversed(range(put_after))
+                                ]
+                            ),
                         )
+
+                        if all(
+                            check_other_word_validity(
+                                board, check_letter, is_column, invalid
+                            )
+                            for check_letter in new_word_details[2]
+                        ):
+                            word_found = True
+                            result.append(new_word_details)
+
+                    if new_word_in_list:
+                        del possible_words[ind]
+
+                    if len(possible_words) > 0:
+                        if orient == 0:
+                            new_before = before - 1
+                            new_after = after
+                        else:
+                            new_before = before
+                            new_after = after - 1
+
+                        if new_before + new_after > 0:
+                            new_letters = letters.copy()
+                            new_letters.remove(l)
+                            extend_word(
+                                possible_words,
+                                new_word,
+                                new_letters,
+                                new_before,
+                                new_after,
+                                wild_letter,
+                            )
+        return word_found
 
     extend_word(words, origi_word, letters, before_max, after_max)
     return result
@@ -272,7 +296,9 @@ def main(board, letters, invalid):
                     final.append(candidate_word)
         final = list(set(final))
         for i in final:
-            result.append(tuple([i, tuple([(l, 7, 7 + n) for n, l in enumerate(i)])]))
+            result.append(
+                tuple([i, tuple([(l, 7, 7 + n, False) for n, l in enumerate(i)])])
+            )
     else:
         columns = list(zip(*board))
 
@@ -331,49 +357,49 @@ if __name__ == "__main__":
     # print((t() - st) * 1000)
     # print(index, dd, words[index])
 
-    # board_str = sys.argv[1]  # Board is passed as a JSON string
-    # letters_str = sys.argv[2]  # Rack is passed as a JSON string
-    # invalid_str = sys.argv[3]
-    # # Deserialize JSON to Python objects
-    # board = json.loads(board_str)
-    # letters = json.loads(letters_str)
-    # invalid = json.loads(invalid_str)
-    board = [
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-        [
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "B",
-            "A",
-            "B",
-            "O",
-            "S",
-            "E",
-            "",
-            "",
-        ],
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-        [""] * 15,
-    ]
+    board_str = sys.argv[1]  # Board is passed as a JSON string
+    letters_str = sys.argv[2]  # Rack is passed as a JSON string
+    invalid_str = sys.argv[3]
+    # Deserialize JSON to Python objects
+    board = json.loads(board_str)
+    letters = json.loads(letters_str)
+    invalid = json.loads(invalid_str)
+    # board = [
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [
+    #         "",
+    #         "",
+    #         "",
+    #         "",
+    #         "",
+    #         "",
+    #         "",
+    #         "B",
+    #         "A",
+    #         "B",
+    #         "O",
+    #         "S",
+    #         "E",
+    #         "",
+    #         "",
+    #     ],
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    #     [""] * 15,
+    # ]
 
-    letters = ["Q", "A", "E", "U", "S", "S", ""]
-    invalid = []
+    # letters = ["Q", "A", "E", "U", "S", "S", ""]
+    # invalid = []
 
     result = main(board, letters, invalid)
     # Convert result to a JSON string

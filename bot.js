@@ -50,6 +50,7 @@ async function bot_put_letters(room) {
   );
 
   const words = JSON.parse(nonparsedwords);
+
   let onlyWords = words.map((word) => word[0]);
   //   const shuffled = [...onlyWords].sort(() => Math.random() - 0.5);
   onlyWords.sort((a, b) => b.length - a.length);
@@ -72,13 +73,25 @@ async function bot_put_letters(room) {
           return currentWord.length > longest.length ? currentWord : longest;
         }, "");
         longest_word = words.find((word) => word[0] === longest);
-        // console.log(longest_word, "got longest");
-
+        console.log(longest_word, convverted_letters);
         for (l of longest_word[1]) {
-          const the_letter = room.allLetters.find(
-            (let) => (let.place === "player-bot") & (let.letter === l[0])
-          );
-          the_letter.place = `board-${l[1]}-${l[2]}`;
+          if (l[3]) {
+            const the_letter = room.allLetters.find((let) => let.letter === "");
+
+            the_letter.points = room.allLetters.filter(
+              (let) => let.letter === l[0]
+            )[0].points;
+
+            the_letter.letter = l[0];
+
+            the_letter["isWid"] = true;
+            the_letter.place = `board-${l[1]}-${l[2]}`;
+          } else {
+            const the_letter = room.allLetters.find(
+              (let) => (let.place === "player-bot") & (let.letter === l[0])
+            );
+            the_letter.place = `board-${l[1]}-${l[2]}`;
+          }
         }
         // Start 'websocket turn' process:
         const { goodWords, allWords } = gather_words(room, botPlayer);
