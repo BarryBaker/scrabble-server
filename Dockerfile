@@ -1,32 +1,20 @@
 # Use a base image that supports Hunspell installation
-FROM node:14-slim  
+FROM node:20-bookworm-slim
 
 # Install dependencies and necessary tools
 RUN apt-get update && apt-get install -y \
-  
-    build-essential \
-    autoconf \
-    automake \
-    libtool \
     wget \
     curl \
     locales \
     pkg-config \
     gettext \
-    autopoint \  
     python3 \
     python3-pip \
     python3-venv \
-    && apt-get clean
+    hunspell \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Hunspell 1.7.2 from source
-RUN wget https://github.com/hunspell/hunspell/archive/v1.7.2.tar.gz \
-    && tar -xzf v1.7.2.tar.gz \
-    && cd hunspell-1.7.2 \
-    && autoreconf -vfi \
-    && ./configure && make && make install \
-    && ldconfig \
-    && cd .. && rm -rf hunspell-1.7.2 v1.7.2.tar.gz
+# Hunspell CLI is provided by the package above; no source build required
 
 # Set default locale to Hungarian (can be changed if necessary)
 ENV LANG=hu_HU.UTF-8

@@ -8,6 +8,8 @@ const http = require("http");
 const app = express();
 app.use(cors());
 
+const PORT = process.env.PORT || 3000;
+
 const server = http.createServer(app); // Create HTTP server
 const wss = new WebSocket.Server({ server }); // Attach WebSocket to HTTP server
 
@@ -259,13 +261,14 @@ wss.on("connection", (ws) => {
         if (room.playerInTurn === "bot") {
           bot_put_letters(room);
         }
+        ``;
     }
   });
 });
-server.listen(3000, () => {
-  console.log("Server is listening on port 3000");
+server.listen(PORT, () => {
+  console.log(`Server is listening on port ${PORT}`);
 });
 
-// checkWordWithHunspell("ng", "en_GB").then((e) => {
-//   console.log(e);
-// });
+checkWordWithHunspell("apol", "hu_HU").then((e) => {
+  console.log(e);
+});
